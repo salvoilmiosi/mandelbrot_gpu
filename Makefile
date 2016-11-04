@@ -1,5 +1,3 @@
-CXX = g++
-LD = g++
 CFLAGS = -g -Wall --std=c++11
 LDFLAGS =
 LIBS = -lmingw32 -lglfw3 -lglew32 -lopengl32
