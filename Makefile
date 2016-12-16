@@ -1,13 +1,17 @@
 CFLAGS = -g -Wall --std=c++11
 LDFLAGS =
-LIBS = -lmingw32 -lglfw3 -lglew32 -lopengl32
+LIBS = `pkg-config --static --libs x11 xrandr xi xxf86vm glew glfw3`
 INCLUDE = include
 OUT_BIN = mandelbrot_gpu
 
 ifeq ($(OS),Windows_NT)
+	LIBS := -lmingw32 -lglfw3 -lglew32 -lopengl32
 	OUT_BIN := $(OUT_BIN).exe
 	LDFLAGS += -mwindows
 endif
+
+$(shell mkdir -p bin >/dev/null)
+$(shell mkdir -p obj >/dev/null)
 
 all: bin/$(OUT_BIN)
 
