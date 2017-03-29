@@ -9,8 +9,8 @@
 #include "color.h"
 #include "sources.h"
 
-static const int window_width = 512;
-static const int window_height = 512;
+static const int window_width = 800;
+static const int window_height = 600;
 
 int current_tex = 0;
 float iteration = 0.f;
@@ -118,6 +118,14 @@ GLuint palette;
 
 texture_io tex1, tex2;
 
+int check_gl_error(const char *msg) {
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR) {
+		fprintf(stderr, "Error %d %s: %s\n", err, msg, glewGetErrorString(err));
+	}
+	return err;
+}
+
 static int check_shader_error(const char *name, const char *type, GLuint shader) {
 	GLint compiled = GL_FALSE;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
@@ -217,7 +225,8 @@ static int create_texture(texture_io *io, int width, int height) {
 
 	glGenFramebuffers(1, &io->fbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, io->fbo);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, io->tex, 0);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, io->tex, 0);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, io->rbo);
 
 	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -228,6 +237,7 @@ static int create_texture(texture_io *io, int width, int height) {
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
 	return 0;
 }
@@ -238,6 +248,15 @@ static void free_texture(texture_io *io) {
 	glDeleteRenderbuffers(1, &io->rbo);
 }
 
+static int next_pow_2(int num) {
+	return num;
+	int n = 1;
+	while (n < num) {
+		n *= 2;
+	}
+	return n;
+}
+
 static int initGL() {
 	program_init.name = "init";
 	program_step.name = "step";
@@ -246,16 +265,17 @@ static int initGL() {
 	if (create_program(&program_step, SOURCE_VERTEX, SOURCE_STEP) != 0) return 2;
 	if (create_program(&program_draw, SOURCE_VERTEX, SOURCE_DRAW) != 0) return 3;
 
+	int text_width = next_pow_2(window_width);
+	int text_height = next_pow_2(window_height);
+
 	if (create_palette(&palette) != 0) return 4;
-	if (create_texture(&tex1, window_width, window_height) != 0) return 5;
-	if (create_texture(&tex2, window_width, window_height) != 0) return 6;
+	if (create_texture(&tex1, text_width, text_height) != 0) return 5;
+	if (create_texture(&tex2, text_width, text_height) != 0) return 6;
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, palette);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, tex1.tex);
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, tex2.tex);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
 	float vertices[] = {
 		-1.0,  1.0,
@@ -323,26 +343,30 @@ static void redraw_mandelbrot() {
 static void render() {
 	glViewport(0, 0, window_width, window_height);
 
+	glActiveTexture(GL_TEXTURE1);
 	switch (current_tex) {
 	case 0:
-		glUseProgram(program_init.program_id);
 		glBindFramebuffer(GL_FRAMEBUFFER, tex1.fbo);
+		glUseProgram(program_init.program_id);
+		glBindTexture(GL_TEXTURE_2D, 0);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		current_tex = 1;
 		break;
 	case 1:
+		glBindFramebuffer(GL_FRAMEBUFFER, tex2.fbo);
 		glUseProgram(program_step.program_id);
 		set_uniform_i(program_step.program_id, "in_texture", 1);
 		set_uniform_f(program_step.program_id, "iteration", iteration);
-		glBindFramebuffer(GL_FRAMEBUFFER, tex2.fbo);
+		glBindTexture(GL_TEXTURE_2D, tex1.tex);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		current_tex = 2;
 		break;
 	case 2:
-		glUseProgram(program_step.program_id);
-		set_uniform_i(program_step.program_id, "in_texture", 2);
-		set_uniform_f(program_step.program_id, "iteration", iteration);
 		glBindFramebuffer(GL_FRAMEBUFFER, tex1.fbo);
+		glUseProgram(program_step.program_id);
+		set_uniform_i(program_step.program_id, "in_texture", 1);
+		set_uniform_f(program_step.program_id, "iteration", iteration);
+		glBindTexture(GL_TEXTURE_2D, tex2.tex);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		current_tex = 1;
 		break;
@@ -350,10 +374,11 @@ static void render() {
 
 	iteration += 1.f;
 
-	glUseProgram(program_draw.program_id);
-	set_uniform_i(program_draw.program_id, "in_texture", current_tex);
-	set_uniform_i(program_draw.program_id, "outside_palette", 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glUseProgram(program_draw.program_id);
+	set_uniform_i(program_draw.program_id, "in_texture", 1);
+	set_uniform_i(program_draw.program_id, "outside_palette", 0);
+	glBindTexture(GL_TEXTURE_2D, current_tex == 1 ? tex1.tex : tex2.tex);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 

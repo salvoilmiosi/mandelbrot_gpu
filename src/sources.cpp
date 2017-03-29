@@ -5,7 +5,7 @@
 const char *const SOURCE_VERTEX =
 R"SOURCE_VERTEX(#version 100
 
-precision mediump float;
+precision highp float;
 
 attribute vec2 position;
 
@@ -31,12 +31,13 @@ void main() {
 const char *const SOURCE_INIT =
 R"SOURCE_INIT(#version 100
 
-precision mediump float;
+precision highp float;
 
 varying vec2 point_c;
 
 void main() {
 	gl_FragColor = vec4(point_c, 0.0, 0.0);
+	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }
 )SOURCE_INIT";
 
@@ -45,7 +46,7 @@ void main() {
 const char *const SOURCE_STEP =
 R"SOURCE_STEP(#version 100
 
-precision mediump float;
+precision highp float;
 
 uniform sampler2D in_texture;
 
@@ -66,6 +67,9 @@ void main() {
 		gl_FragColor.z = iteration;
 		gl_FragColor.w = 0.0;
 	}
+
+	//DEBUG
+	//gl_FragColor = in_color;
 }
 )SOURCE_STEP";
 
@@ -74,12 +78,12 @@ void main() {
 const char *const SOURCE_DRAW =
 R"SOURCE_DRAW(#version 100
 
-precision mediump float;
+precision highp float;
 
 uniform sampler2D in_texture;
 uniform sampler2D outside_palette;
 
-const vec4 color_inside = vec4(0.0, 0.0, 1.0, 1.0);
+const vec4 color_inside = vec4(0.0, 0.0, 0.0, 1.0);
 const float max_iterations = 256.0;
 
 varying vec2 point_c;
@@ -94,6 +98,10 @@ void main() {
 	} else {
 		gl_FragColor = texture2D(outside_palette, vec2(0.4 + in_color.z / max_iterations, 0.0));
 	}
+
+	//DEBUG
+	//gl_FragColor = vec4(in_color.xyz, 1.0);
+	//gl_FragColor = vec4(point_c, 0.0, 1.0);
 }
 )SOURCE_DRAW";
 
