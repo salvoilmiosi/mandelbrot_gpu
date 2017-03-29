@@ -1,3 +1,5 @@
 *.exe
 *.o
-bin/mandelbrot_gpu
+*.d
+bin/
+obj/

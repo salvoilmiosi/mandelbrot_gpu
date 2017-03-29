@@ -1,8 +1,16 @@
+CXX = g++
+LD = g++
+MAKE = make
 CFLAGS = -g -Wall --std=c++11
+
 LDFLAGS =
 LIBS = `pkg-config --static --libs x11 xrandr xi xxf86vm glew glfw3`
-INCLUDE = include
-OUT_BIN = mandelbrot_gpu
+
+INCLUDE = -Iinclude -I$(RESPACK_DIR)/include
+BIN_DIR = ../bin
+OBJ_DIR = obj
+
+OUT_BIN = mandelbrot
 
 ifeq ($(OS),Windows_NT)
 	LIBS := -lmingw32 -lglfw3 -lglew32 -lopengl32
@@ -10,19 +18,34 @@ ifeq ($(OS),Windows_NT)
 	LDFLAGS += -mwindows
 endif
 
-$(shell mkdir -p bin >/dev/null)
-$(shell mkdir -p obj >/dev/null)
+$(shell mkdir -p $(BIN_DIR) >/dev/null)
+$(shell mkdir -p $(OBJ_DIR) >/dev/null)
 
-all: bin/$(OUT_BIN)
+DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJ_DIR)/$*.Td
 
-bin/$(OUT_BIN): obj/color.o obj/main.o obj/sources.o
-	g++ -o bin/$(OUT_BIN) obj/color.o obj/main.o obj/sources.o $(LDFLAGS) $(LIBS)
+SOURCES = $(wildcard src/*.cpp)
+OBJECTS = $(patsubst src/%,$(OBJ_DIR)/%.o,$(basename $(SOURCES))) $(RESLOAD)
 
-obj/color.o: src/color.cpp include/color.h
-	g++ -c $(CFLAGS) -I $(INCLUDE) -o $@ $<
+all: $(BIN_DIR)/$(OUT_BIN)
 
-obj/main.o: src/main.cpp
-	g++ -c $(CFLAGS) -I $(INCLUDE) -o $@ $<
+clean:
+	rm -rf $(BIN_DIR)
+	rm -rf $(OBJ_DIR)
+	$(MAKE) -C $(RESPACK_DIR) clean
 
-obj/sources.o: src/sources.cpp include/sources.h
-	g++ -c $(CFLAGS) -I $(INCLUDE) -o $@ $<
+$(RESLOAD): $(RESPACK)
+$(RESPACK):
+	$(MAKE) -C $(RESPACK_DIR)
+
+$(BIN_DIR)/$(OUT_BIN): $(OBJECTS)
+	$(LD) -o $(BIN_DIR)/$(OUT_BIN) $(OBJECTS) $(LDFLAGS) $(LIBS)
+
+$(OBJ_DIR)/%.o : src/%.cpp
+$(OBJ_DIR)/%.o : src/%.cpp $(OBJ_DIR)/%.d
+	$(CXX) $(DEPFLAGS) $(CFLAGS) -c $(INCLUDE) -o $@ $<
+	@mv -f $(OBJ_DIR)/$*.Td $(OBJ_DIR)/$*.d
+
+$(OBJ_DIR)/%.d: ;
+.PRECIOUS: $(OBJ_DIR)/%.d
+
+-include $(patsubst src/%,$(OBJ_DIR)/%.d,$(basename $(SOURCES)))
