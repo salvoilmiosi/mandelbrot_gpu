@@ -9,8 +9,8 @@
 #include "color.h"
 #include "sources.h"
 
-static const int window_width = 800;
-static const int window_height = 600;
+static const int window_width = 512;
+static const int window_height = 512;
 
 int current_tex = 0;
 float iteration = 0.f;
@@ -226,6 +226,9 @@ static int create_texture(texture_io *io, int width, int height) {
 		return 1;
 	}
 
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
 	return 0;
 }
 
@@ -325,7 +328,7 @@ static void render() {
 		glUseProgram(program_init.program_id);
 		glBindFramebuffer(GL_FRAMEBUFFER, tex1.fbo);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-		//current_tex = 1;
+		current_tex = 1;
 		break;
 	case 1:
 		glUseProgram(program_step.program_id);
@@ -348,7 +351,7 @@ static void render() {
 	iteration += 1.f;
 
 	glUseProgram(program_draw.program_id);
-	set_uniform_i(program_draw.program_id, "in_texture", 1);//current_tex);
+	set_uniform_i(program_draw.program_id, "in_texture", current_tex);
 	set_uniform_i(program_draw.program_id, "outside_palette", 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
