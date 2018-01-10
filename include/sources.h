@@ -1,12 +1,15 @@
 #ifndef __SOURCES_H__
 #define __SOURCES_H__
 
-extern const char *const SOURCE_VERTEX;
+#include <string>
 
-extern const char *const SOURCE_INIT;
+enum files {
+	FILE_VERTEX,
+	FILE_INIT,
+	FILE_STEP,
+	FILE_DRAW
+};
 
-extern const char *const SOURCE_STEP;
-
-extern const char *const SOURCE_DRAW;
+std::string getFile(files file);
 
 #endif // __SOURCES_H__

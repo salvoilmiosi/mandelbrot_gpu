@@ -2,12 +2,11 @@ CXX = g++
 LD = g++
 MAKE = make
 CFLAGS = -g -Wall --std=c++11
-
 LDFLAGS =
 LIBS = `pkg-config --static --libs x11 xrandr xi xxf86vm glew glfw3`
 
-INCLUDE = -Iinclude -I$(RESPACK_DIR)/include
-BIN_DIR = ../bin
+INCLUDE = include
+BIN_DIR = bin
 OBJ_DIR = obj
 
 OUT_BIN = mandelbrot
@@ -18,32 +17,33 @@ ifeq ($(OS),Windows_NT)
 	LDFLAGS += -mwindows
 endif
 
-$(shell mkdir -p $(BIN_DIR) >/dev/null)
-$(shell mkdir -p $(OBJ_DIR) >/dev/null)
-
 DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJ_DIR)/$*.Td
 
 SOURCES = $(wildcard src/*.cpp)
-OBJECTS = $(patsubst src/%,$(OBJ_DIR)/%.o,$(basename $(SOURCES))) $(RESLOAD)
+OBJECTS = $(patsubst src/%,$(OBJ_DIR)/%.o,$(basename $(SOURCES)))
+
+SHADERS = $(wildcard src/*.glsl)
+RESOURCE_OBJ = $(patsubst src/%,$(OBJ_DIR)/%.o,$(basename $(SHADERS)))
 
 all: $(BIN_DIR)/$(OUT_BIN)
 
 clean:
 	rm -rf $(BIN_DIR)
 	rm -rf $(OBJ_DIR)
-	$(MAKE) -C $(RESPACK_DIR) clean
 
-$(RESLOAD): $(RESPACK)
-$(RESPACK):
-	$(MAKE) -C $(RESPACK_DIR)
-
-$(BIN_DIR)/$(OUT_BIN): $(OBJECTS)
-	$(LD) -o $(BIN_DIR)/$(OUT_BIN) $(OBJECTS) $(LDFLAGS) $(LIBS)
+$(BIN_DIR)/$(OUT_BIN): $(OBJECTS) $(RESOURCE_OBJ)
+	@mkdir -p $(BIN_DIR)
+	$(LD) -o $(BIN_DIR)/$(OUT_BIN) $(OBJECTS) $(RESOURCE_OBJ) $(LDFLAGS) $(LIBS)
 
 $(OBJ_DIR)/%.o : src/%.cpp
 $(OBJ_DIR)/%.o : src/%.cpp $(OBJ_DIR)/%.d
-	$(CXX) $(DEPFLAGS) $(CFLAGS) -c $(INCLUDE) -o $@ $<
+	@mkdir -p $(OBJ_DIR)
+	$(CXX) $(DEPFLAGS) $(CFLAGS) -c $(addprefix -I,$(INCLUDE)) -o $@ $<
 	@mv -f $(OBJ_DIR)/$*.Td $(OBJ_DIR)/$*.d
+
+$(OBJ_DIR)/%.o : src/%.glsl
+	@mkdir -p $(OBJ_DIR)
+	objcopy -I binary -O elf64-x86-64 -B i386 $< $@
 
 $(OBJ_DIR)/%.d: ;
 .PRECIOUS: $(OBJ_DIR)/%.d

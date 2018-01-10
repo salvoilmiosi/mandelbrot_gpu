@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <math.h>
 
 #include "color.h"
@@ -179,6 +180,10 @@ static int create_program(shader_program *program, const char *vertex_source, co
 	return 0;
 }
 
+static int create_program(shader_program *program, const std::string &vertex_source, const std::string &fragment_source) {
+	return create_program(program, vertex_source.c_str(), fragment_source.c_str());
+}
+
 static void free_program(shader_program *program) {
 	glDetachShader(program->program_id, program->vertex_shader);
 	glDeleteShader(program->vertex_shader);
@@ -261,9 +266,9 @@ static int initGL() {
 	program_init.name = "init";
 	program_step.name = "step";
 	program_draw.name = "draw";
-	if (create_program(&program_init, SOURCE_VERTEX, SOURCE_INIT) != 0) return 1;
-	if (create_program(&program_step, SOURCE_VERTEX, SOURCE_STEP) != 0) return 2;
-	if (create_program(&program_draw, SOURCE_VERTEX, SOURCE_DRAW) != 0) return 3;
+	if (create_program(&program_init, getFile(FILE_VERTEX), getFile(FILE_INIT)) != 0) return 1;
+	if (create_program(&program_step, getFile(FILE_VERTEX), getFile(FILE_STEP)) != 0) return 2;
+	if (create_program(&program_draw, getFile(FILE_VERTEX), getFile(FILE_DRAW)) != 0) return 3;
 
 	int text_width = next_pow_2(window_width);
 	int text_height = next_pow_2(window_height);
@@ -403,9 +408,9 @@ int main(int argc, char**argv) {
 
 	glfwSetErrorCallback(error_callback);
 
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
 	GLFWwindow *window = glfwCreateWindow(window_width, window_height, "Mandelbrot", nullptr, nullptr);
