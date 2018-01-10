@@ -5,9 +5,10 @@ CFLAGS = -g -Wall --std=c++11
 LDFLAGS =
 LIBS = `pkg-config --static --libs x11 xrandr xi xxf86vm glew glfw3`
 
-INCLUDE = include
+INCLUDE = 
 BIN_DIR = bin
 OBJ_DIR = obj
+SHADER_DIR = shader
 
 OUT_BIN = mandelbrot
 
@@ -22,8 +23,8 @@ DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJ_DIR)/$*.Td
 SOURCES = $(wildcard src/*.cpp)
 OBJECTS = $(patsubst src/%,$(OBJ_DIR)/%.o,$(basename $(SOURCES)))
 
-SHADERS = $(wildcard src/*.glsl)
-RESOURCE_OBJ = $(patsubst src/%,$(OBJ_DIR)/%.o,$(basename $(SHADERS)))
+SHADERS = $(wildcard $(SHADER_DIR)/*.glsl)
+SHADER_OBJ = $(patsubst $(SHADER_DIR)/%,$(OBJ_DIR)/%.o,$(basename $(SHADERS)))
 
 all: $(BIN_DIR)/$(OUT_BIN)
 
@@ -31,9 +32,9 @@ clean:
 	rm -rf $(BIN_DIR)
 	rm -rf $(OBJ_DIR)
 
-$(BIN_DIR)/$(OUT_BIN): $(OBJECTS) $(RESOURCE_OBJ)
+$(BIN_DIR)/$(OUT_BIN): $(OBJECTS) $(SHADER_OBJ)
 	@mkdir -p $(BIN_DIR)
-	$(LD) -o $(BIN_DIR)/$(OUT_BIN) $(OBJECTS) $(RESOURCE_OBJ) $(LDFLAGS) $(LIBS)
+	$(LD) -o $(BIN_DIR)/$(OUT_BIN) $(OBJECTS) $(SHADER_OBJ) $(LDFLAGS) $(LIBS)
 
 $(OBJ_DIR)/%.o : src/%.cpp
 $(OBJ_DIR)/%.o : src/%.cpp $(OBJ_DIR)/%.d
@@ -41,7 +42,7 @@ $(OBJ_DIR)/%.o : src/%.cpp $(OBJ_DIR)/%.d
 	$(CXX) $(DEPFLAGS) $(CFLAGS) -c $(addprefix -I,$(INCLUDE)) -o $@ $<
 	@mv -f $(OBJ_DIR)/$*.Td $(OBJ_DIR)/$*.d
 
-$(OBJ_DIR)/%.o : src/%.glsl
+$(OBJ_DIR)/%.o : shader/%.glsl
 	@mkdir -p $(OBJ_DIR)
 	objcopy -I binary -O elf64-x86-64 -B i386 $< $@
 

@@ -4,10 +4,10 @@
 #include <string>
 
 enum files {
-	FILE_VERTEX,
-	FILE_INIT,
-	FILE_STEP,
-	FILE_DRAW
+	SOURCE_VERTEX,
+	SOURCE_INIT,
+	SOURCE_STEP,
+	SOURCE_DRAW
 };
 
 std::string getFile(files file);

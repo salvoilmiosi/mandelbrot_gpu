@@ -7,7 +7,6 @@
 #include <string>
 #include <math.h>
 
-#include "color.h"
 #include "sources.h"
 
 static const int window_width = 800;
@@ -192,14 +191,21 @@ static void free_program(shader_program *program) {
 	glDeleteProgram(program->program_id);
 }
 
+static uint32_t color_rgba(int r, int g, int b, int a = 0xff) {
+	return ((r & 0xff) |
+			((g & 0xff) << 8) |
+			((b & 0xff) << 16) |
+			((a & 0xff) << 24));
+}
+
 static int create_palette(GLuint *id) {
-	color colors[256];
+	uint32_t colors[256];
 
 	for (int i=0; i<256; ++i) {
 		double red   = sin(i * 0.3) * 0x80 + 0x80;
 		double green = sin(i * 0.2) * 0x80 + 0x80;
 		double blue  = sin(i * 0.5) * 0x80 + 0x80;
-		colors[i] = color(red, green, blue);
+		colors[i] = color_rgba(red, green, blue);
 	}
 
 	glGenTextures(1, id);
@@ -266,9 +272,9 @@ static int initGL() {
 	program_init.name = "init";
 	program_step.name = "step";
 	program_draw.name = "draw";
-	if (create_program(&program_init, getFile(FILE_VERTEX), getFile(FILE_INIT)) != 0) return 1;
-	if (create_program(&program_step, getFile(FILE_VERTEX), getFile(FILE_STEP)) != 0) return 2;
-	if (create_program(&program_draw, getFile(FILE_VERTEX), getFile(FILE_DRAW)) != 0) return 3;
+	if (create_program(&program_init, getFile(SOURCE_VERTEX), getFile(SOURCE_INIT)) != 0) return 1;
+	if (create_program(&program_step, getFile(SOURCE_VERTEX), getFile(SOURCE_STEP)) != 0) return 2;
+	if (create_program(&program_draw, getFile(SOURCE_VERTEX), getFile(SOURCE_DRAW)) != 0) return 3;
 
 	int text_width = next_pow_2(window_width);
 	int text_height = next_pow_2(window_height);
