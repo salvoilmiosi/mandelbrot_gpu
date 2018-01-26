@@ -11,6 +11,7 @@
 
 static const int window_width = 800;
 static const int window_height = 600;
+static const char *WINDOW_TITLE = "Mandelbrot";
 
 int current_tex = 0;
 float iteration = 0.f;
@@ -407,6 +408,25 @@ static void cleanupGL() {
 	glDeleteTextures(1, &palette);
 }
 
+GLFWwindow *createTheWindow() {
+	GLFWwindow *window;
+
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	
+	window = glfwCreateWindow(window_width, window_height, WINDOW_TITLE, nullptr, nullptr);
+	if (window) return window;
+
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+	
+	return glfwCreateWindow(window_width, window_height, WINDOW_TITLE, nullptr, nullptr);
+}
+
 int main(int argc, char**argv) {
 	if (!glfwInit()) {
 		return 1;
@@ -414,12 +434,7 @@ int main(int argc, char**argv) {
 
 	glfwSetErrorCallback(error_callback);
 
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-
-	GLFWwindow *window = glfwCreateWindow(window_width, window_height, "Mandelbrot", nullptr, nullptr);
+	GLFWwindow *window = createTheWindow();
 
 	if (!window) {
 		glfwTerminate();
