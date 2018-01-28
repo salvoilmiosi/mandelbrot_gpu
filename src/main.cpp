@@ -114,11 +114,13 @@ struct shader_program {
 	GLuint program_id;
 	GLuint vertex_shader;
 	GLuint fragment_shader;
+
+	explicit shader_program(const char *name) : name(name) {}
 };
 
-shader_program program_init;
-shader_program program_step;
-shader_program program_draw;
+shader_program program_init("init");
+shader_program program_step("step");
+shader_program program_draw("draw");
 
 struct texture_io {
 	GLuint tex;
@@ -284,12 +286,9 @@ static int tex_width = next_pow_2(window_width);
 static int tex_height = next_pow_2(window_height);
 
 static int initGL() {
-	program_init.name = "init";
-	program_step.name = "step";
-	program_draw.name = "draw";
-	if (create_program(&program_init, getFile(SOURCE_VERTEX), getFile(SOURCE_INIT)) != 0) return 1;
-	if (create_program(&program_step, getFile(SOURCE_VERTEX), getFile(SOURCE_STEP)) != 0) return 2;
-	if (create_program(&program_draw, getFile(SOURCE_VERTEX), getFile(SOURCE_DRAW)) != 0) return 3;
+	if (create_program(&program_init, GET_SHADER(vertex), GET_SHADER(init)) != 0) return 1;
+	if (create_program(&program_step, GET_SHADER(vertex), GET_SHADER(step)) != 0) return 2;
+	if (create_program(&program_draw, GET_SHADER(vertex), GET_SHADER(draw)) != 0) return 3;
 
 	if (create_palette(&palette) != 0) return 4;
 	if (create_texture(&tex1, tex_width, tex_height) != 0) return 5;

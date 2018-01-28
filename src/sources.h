@@ -3,13 +3,19 @@
 
 #include <string>
 
-enum files {
-	SOURCE_VERTEX,
-	SOURCE_INIT,
-	SOURCE_STEP,
-	SOURCE_DRAW
-};
+#define BINARY_START(name) _binary_##name##_start
+#define BINARY_END(name) _binary_##name##_end
+#define BINARY_DECLARE(name) extern char BINARY_START(name); extern char BINARY_END(name);
+#define GET_RESOURCE(name) std::string(&BINARY_START(name), &BINARY_END(name))
 
-std::string getFile(files file);
+#define SHADER(name) shader_##name##_glsl
+#define SHADER_DECLARE(name) BINARY_DECLARE(SHADER(name))
+
+#define GET_SHADER(name) GET_RESOURCE(SHADER(name))
+
+SHADER_DECLARE(vertex);
+SHADER_DECLARE(init);
+SHADER_DECLARE(step);
+SHADER_DECLARE(draw);
 
 #endif // __SOURCES_H__

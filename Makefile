@@ -1,8 +1,8 @@
 CXX = g++
 LD = g++
 MAKE = make
-CFLAGS = -g -Wall --std=c++11
-LDFLAGS =
+CFLAGS = -Wall --std=c++11
+LDFLAGS = -s -O2
 LIBS = `pkg-config --static --libs x11 xrandr xi xxf86vm glew glfw3`
 
 INCLUDE = 
