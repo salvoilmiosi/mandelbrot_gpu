@@ -18,7 +18,7 @@ void main() {
 	if (dot(point_z, point_z) < 4.0) {
 		gl_FragColor = color_inside;
 	} else {
-		gl_FragColor = texture2D(outside_palette, vec2(0.4 + in_color.z / max_iterations, 0.0));
+		gl_FragColor = texture2D(outside_palette, vec2(0.2 + in_color.z / max_iterations, 0.0));
 	}
 
 	//DEBUG

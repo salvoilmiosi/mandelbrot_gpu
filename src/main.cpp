@@ -14,6 +14,9 @@ static const char *WINDOW_TITLE = "Mandelbrot";
 static int window_width = 800;
 static int window_height = 600;
 
+static int tex_width;
+static int tex_height;
+
 int current_tex = 0;
 float iteration = 0.f;
 
@@ -96,12 +99,6 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 	}
 }
 
-static void resize_callback(GLFWwindow *window, int width, int height) {
-	window_width = width;
-	window_height = height;
-	redraw_mandelbrot();
-}
-
 static double get_ratio() {
 	return (double) window_width / window_height;
 }
@@ -123,9 +120,9 @@ shader_program program_step("step");
 shader_program program_draw("draw");
 
 struct texture_io {
-	GLuint tex;
-	GLuint fbo;
-	GLuint rbo;
+	GLuint tex = 0;
+	GLuint fbo = 0;
+	GLuint rbo = 0;
 };
 
 GLuint palette;
@@ -234,7 +231,17 @@ static int create_palette(GLuint *id) {
 	return 0;
 }
 
+static void free_texture(texture_io *io) {
+	glDeleteFramebuffers(1, &io->fbo);
+	glDeleteTextures(1, &io->tex);
+	glDeleteRenderbuffers(1, &io->rbo);
+}
+
 static int create_texture(texture_io *io, int width, int height) {
+	if (&io->tex) {
+		free_texture(io);
+	}
+
 	glGenTextures(1, &io->tex);
 	glBindTexture(GL_TEXTURE_2D, io->tex);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, 0);
@@ -267,12 +274,6 @@ static int create_texture(texture_io *io, int width, int height) {
 	return 0;
 }
 
-static void free_texture(texture_io *io) {
-	glDeleteFramebuffers(1, &io->fbo);
-	glDeleteTextures(1, &io->tex);
-	glDeleteRenderbuffers(1, &io->rbo);
-}
-
 static int next_pow_2(int num) {
 	//return num;
 	int n = 1;
@@ -282,8 +283,20 @@ static int next_pow_2(int num) {
 	return n;
 }
 
-static int tex_width = next_pow_2(window_width);
-static int tex_height = next_pow_2(window_height);
+static bool create_textures() {
+	tex_width = next_pow_2(window_width);
+	tex_height = next_pow_2(window_height);
+	if (create_texture(&tex1, tex_width, tex_height) != 0) return false;
+	if (create_texture(&tex2, tex_width, tex_height) != 0) return false;
+	return true;
+}
+
+static void resize_callback(GLFWwindow *window, int width, int height) {
+	window_width = width;
+	window_height = height;
+	create_textures();
+	redraw_mandelbrot();
+}
 
 static int initGL() {
 	if (create_program(&program_init, GET_SHADER(vertex), GET_SHADER(init)) != 0) return 1;
@@ -291,8 +304,7 @@ static int initGL() {
 	if (create_program(&program_draw, GET_SHADER(vertex), GET_SHADER(draw)) != 0) return 3;
 
 	if (create_palette(&palette) != 0) return 4;
-	if (create_texture(&tex1, tex_width, tex_height) != 0) return 5;
-	if (create_texture(&tex2, tex_width, tex_height) != 0) return 6;
+	if (!create_textures()) return 5;
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, palette);
