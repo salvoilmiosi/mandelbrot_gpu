@@ -9,9 +9,10 @@
 
 #include "sources.h"
 
-static const int window_width = 800;
-static const int window_height = 600;
 static const char *WINDOW_TITLE = "Mandelbrot";
+
+static int window_width = 800;
+static int window_height = 600;
 
 int current_tex = 0;
 float iteration = 0.f;
@@ -93,6 +94,16 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 		}
 		break;
 	}
+}
+
+static void resize_callback(GLFWwindow *window, int width, int height) {
+	window_width = width;
+	window_height = height;
+	redraw_mandelbrot();
+}
+
+static double get_ratio() {
+	return (double) window_width / window_height;
 }
 
 GLuint vao;
@@ -261,13 +272,16 @@ static void free_texture(texture_io *io) {
 }
 
 static int next_pow_2(int num) {
-	return num;
+	//return num;
 	int n = 1;
 	while (n < num) {
 		n *= 2;
 	}
 	return n;
 }
+
+static int tex_width = next_pow_2(window_width);
+static int tex_height = next_pow_2(window_height);
 
 static int initGL() {
 	program_init.name = "init";
@@ -277,12 +291,9 @@ static int initGL() {
 	if (create_program(&program_step, getFile(SOURCE_VERTEX), getFile(SOURCE_STEP)) != 0) return 2;
 	if (create_program(&program_draw, getFile(SOURCE_VERTEX), getFile(SOURCE_DRAW)) != 0) return 3;
 
-	int text_width = next_pow_2(window_width);
-	int text_height = next_pow_2(window_height);
-
 	if (create_palette(&palette) != 0) return 4;
-	if (create_texture(&tex1, text_width, text_height) != 0) return 5;
-	if (create_texture(&tex2, text_width, text_height) != 0) return 6;
+	if (create_texture(&tex1, tex_width, tex_height) != 0) return 5;
+	if (create_texture(&tex2, tex_width, tex_height) != 0) return 6;
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, palette);
@@ -339,21 +350,21 @@ static void redraw_mandelbrot() {
 	glUseProgram(program_init.program_id);
 	set_uniform_vec2(program_init.program_id, "center", center);
 	set_uniform_f(program_init.program_id, "scale", scale);
-	set_uniform_f(program_init.program_id, "ratio", (double) window_width / window_height);
+	set_uniform_f(program_init.program_id, "ratio", get_ratio());
 
 	glUseProgram(program_step.program_id);
 	set_uniform_vec2(program_step.program_id, "center", center);
 	set_uniform_f(program_step.program_id, "scale", scale);
-	set_uniform_f(program_step.program_id, "ratio", (double) window_width / window_height);
+	set_uniform_f(program_step.program_id, "ratio", get_ratio());
 
 	glUseProgram(program_draw.program_id);
 	set_uniform_vec2(program_draw.program_id, "center", center);
 	set_uniform_f(program_draw.program_id, "scale", scale);
-	set_uniform_f(program_draw.program_id, "ratio", (double) window_width / window_height);
+	set_uniform_f(program_draw.program_id, "ratio", get_ratio());
 }
 
 static void render() {
-	glViewport(0, 0, window_width, window_height);
+	glViewport(0, 0, tex_width, tex_height);
 
 	glActiveTexture(GL_TEXTURE1);
 	switch (current_tex) {
@@ -386,6 +397,8 @@ static void render() {
 
 	iteration += 1.f;
 
+	glViewport(0, 0, window_width, window_height);
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glUseProgram(program_draw.program_id);
 	set_uniform_i(program_draw.program_id, "in_texture", 1);
@@ -411,7 +424,7 @@ static void cleanupGL() {
 GLFWwindow *createTheWindow() {
 	GLFWwindow *window;
 
-	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -455,6 +468,7 @@ int main(int argc, char**argv) {
 
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
+	glfwSetWindowSizeCallback(window, resize_callback);
 
 	if (initGL() != 0) {
 		glfwTerminate();
