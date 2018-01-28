@@ -6,7 +6,7 @@ uniform sampler2D in_texture;
 uniform sampler2D outside_palette;
 
 const vec4 color_inside = vec4(0.0, 0.0, 0.0, 1.0);
-const float max_iterations = 256.0;
+const float max_iterations = 1024.0;
 
 varying vec2 point_c;
 varying vec2 tex_coords;
@@ -18,7 +18,8 @@ void main() {
 	if (dot(point_z, point_z) < 4.0) {
 		gl_FragColor = color_inside;
 	} else {
-		gl_FragColor = texture2D(outside_palette, vec2(0.2 + in_color.z / max_iterations, 0.0));
+		float color_i = 1.0 / (1.0 + 0.2 * log(1.0 + in_color.z));
+		gl_FragColor = texture2D(outside_palette, vec2(color_i, 0.0));
 	}
 
 	//DEBUG

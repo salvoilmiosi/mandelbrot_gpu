@@ -210,9 +210,10 @@ static uint32_t color_rgba(int r, int g, int b, int a = 0xff) {
 }
 
 static int create_palette(GLuint *id) {
-	uint32_t colors[256];
+	static const int N_COLORS = 256;
 
-	for (int i=0; i<256; ++i) {
+	uint32_t colors[N_COLORS];
+	for (int i=0; i<N_COLORS; ++i) {
 		double red   = sin(i * 0.3) * 0x80 + 0x80;
 		double green = sin(i * 0.2) * 0x80 + 0x80;
 		double blue  = sin(i * 0.5) * 0x80 + 0x80;
@@ -221,12 +222,12 @@ static int create_palette(GLuint *id) {
 
 	glGenTextures(1, id);
 	glBindTexture(GL_TEXTURE_2D, *id);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, sizeof(colors) / sizeof(int), 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, colors);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, N_COLORS, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, colors);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	return 0;
 }
