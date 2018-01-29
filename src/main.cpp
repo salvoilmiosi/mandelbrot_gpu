@@ -5,28 +5,25 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 #include <math.h>
 
 #include "sources.h"
+
+#include "program.h"
+#include "render_target.h"
 
 static const char *WINDOW_TITLE = "Mandelbrot";
 
 static int window_width = 800;
 static int window_height = 600;
 
-static int tex_width;
-static int tex_height;
-
 int current_tex = 0;
 float iteration = 0.f;
 
-struct vec2 {
-	float x;
-	float y;
-};
-
 vec2 center;
 float scale;
+float log_coeff = 0.03f;
 
 static void reset_mandelbrot();
 static void redraw_mandelbrot();
@@ -56,6 +53,14 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 		case GLFW_KEY_PAGE_DOWN:
 			scale *= 2.f;
 			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_UP:
+			log_coeff += 0.01f;
+			break;
+		case GLFW_KEY_DOWN:
+			log_coeff -= 0.01f;
+			break;
+		default:
 			break;
 		}
 		break;
@@ -99,35 +104,20 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 	}
 }
 
-static double get_ratio() {
-	return (double) window_width / window_height;
-}
-
 GLuint vao;
 GLuint vbo;
 
-struct shader_program {
-	const char *name;
-	GLuint program_id;
-	GLuint vertex_shader;
-	GLuint fragment_shader;
+program program_init("init");
+program program_step("step");
+program program_draw("draw");
 
-	explicit shader_program(const char *name) : name(name) {}
-};
+shader shader_vertex("vertex", GL_VERTEX_SHADER);
+shader shader_init("init", GL_FRAGMENT_SHADER);
+shader shader_step("step", GL_FRAGMENT_SHADER);
+shader shader_draw("draw", GL_FRAGMENT_SHADER);
 
-shader_program program_init("init");
-shader_program program_step("step");
-shader_program program_draw("draw");
-
-struct texture_io {
-	GLuint tex = 0;
-	GLuint fbo = 0;
-	GLuint rbo = 0;
-};
-
-GLuint palette;
-
-texture_io tex1, tex2;
+static const int N_COLORS = 256;
+texture palette(N_COLORS, 1);
 
 int check_gl_error(const char *msg) {
 	GLenum err = glGetError();
@@ -137,71 +127,6 @@ int check_gl_error(const char *msg) {
 	return err;
 }
 
-static int check_shader_error(const char *name, const char *type, GLuint shader) {
-	GLint compiled = GL_FALSE;
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
-	if (compiled != GL_TRUE) {
-		int length = 0;
-		int max_length = 0;
-
-		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &max_length);
-
-		char *info_log = new char[max_length];
-
-		glGetShaderInfoLog(shader, max_length, &length, info_log);
-		if (length > 0){
-			fprintf(stderr, "%s %s Error:\n%s\n", name, type, info_log);
-		}
-
-		delete[] info_log;
-
-		return 1;
-	}
-	return 0;
-}
-
-static int create_program(shader_program *program, const char *vertex_source, const char *fragment_source) {
-	program->program_id = glCreateProgram();
-
-	program->vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-	int vertex_source_length = strlen(vertex_source);
-	glShaderSource(program->vertex_shader, 1, &vertex_source, &vertex_source_length);
-	glCompileShader(program->vertex_shader);
-
-	if (check_shader_error(program->name, "vertex", program->vertex_shader) != 0) {
-		return 1;
-	}
-
-	glAttachShader(program->program_id, program->vertex_shader);
-
-	program->fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-	int fragment_source_length = strlen(fragment_source);
-	glShaderSource(program->fragment_shader, 1, &fragment_source, &fragment_source_length);
-	glCompileShader(program->fragment_shader);
-
-	if (check_shader_error(program->name, "frag", program->fragment_shader) != 0) {
-		return 1;
-	}
-
-	glAttachShader(program->program_id, program->fragment_shader);
-
-	glLinkProgram(program->program_id);
-
-	return 0;
-}
-
-static int create_program(shader_program *program, const std::string &vertex_source, const std::string &fragment_source) {
-	return create_program(program, vertex_source.c_str(), fragment_source.c_str());
-}
-
-static void free_program(shader_program *program) {
-	glDetachShader(program->program_id, program->vertex_shader);
-	glDeleteShader(program->vertex_shader);
-	glDetachShader(program->program_id, program->fragment_shader);
-	glDeleteShader(program->fragment_shader);
-	glDeleteProgram(program->program_id);
-}
-
 static uint32_t color_rgba(int r, int g, int b, int a = 0xff) {
 	return ((r & 0xff) |
 			((g & 0xff) << 8) |
@@ -209,9 +134,7 @@ static uint32_t color_rgba(int r, int g, int b, int a = 0xff) {
 			((a & 0xff) << 24));
 }
 
-static int create_palette(GLuint *id) {
-	static const int N_COLORS = 256;
-
+static void create_palette() {
 	uint32_t colors[N_COLORS];
 	for (int i=0; i<N_COLORS; ++i) {
 		double red   = sin(i * 0.3) * 0x80 + 0x80;
@@ -220,59 +143,8 @@ static int create_palette(GLuint *id) {
 		colors[i] = color_rgba(red, green, blue);
 	}
 
-	glGenTextures(1, id);
-	glBindTexture(GL_TEXTURE_2D, *id);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, N_COLORS, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, colors);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	return 0;
-}
-
-static void free_texture(texture_io *io) {
-	glDeleteFramebuffers(1, &io->fbo);
-	glDeleteTextures(1, &io->tex);
-	glDeleteRenderbuffers(1, &io->rbo);
-}
-
-static int create_texture(texture_io *io, int width, int height) {
-	if (&io->tex) {
-		free_texture(io);
-	}
-
-	glGenTextures(1, &io->tex);
-	glBindTexture(GL_TEXTURE_2D, io->tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, 0);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	glGenRenderbuffers(1, &io->rbo);
-	glBindRenderbuffer(GL_RENDERBUFFER, io->rbo);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
-
-	glGenFramebuffers(1, &io->fbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, io->fbo);
-
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, io->tex, 0);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, io->rbo);
-
-	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	if (status != GL_FRAMEBUFFER_COMPLETE) {
-		fprintf(stderr, "%s\n", "Framebuffer is not complete");
-		return 1;
-	}
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glBindRenderbuffer(GL_RENDERBUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	return 0;
+	palette.attachPixels(GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, colors);
+	palette.setFilter(GL_LINEAR);
 }
 
 static int next_pow_2(int num) {
@@ -284,12 +156,20 @@ static int next_pow_2(int num) {
 	return n;
 }
 
-static bool create_textures() {
-	tex_width = next_pow_2(window_width);
-	tex_height = next_pow_2(window_height);
-	if (create_texture(&tex1, tex_width, tex_height) != 0) return false;
-	if (create_texture(&tex2, tex_width, tex_height) != 0) return false;
-	return true;
+std::vector<texture> textures;
+std::vector<render_target> targets;
+
+static void create_textures() {
+	textures.clear();
+	targets.clear();
+
+	int tex_width = next_pow_2(window_width);
+	int tex_height = next_pow_2(window_height);
+	for (int i=0; i<2; ++i) {
+		texture &tex = textures.emplace_back(tex_width, tex_height);
+		tex.attachPixels(GL_RGBA32F, GL_RGBA, GL_FLOAT, nullptr);
+		targets.emplace_back(tex);
+	}
 }
 
 static void resize_callback(GLFWwindow *window, int width, int height) {
@@ -300,15 +180,25 @@ static void resize_callback(GLFWwindow *window, int width, int height) {
 }
 
 static int initGL() {
-	if (create_program(&program_init, GET_SHADER(vertex), GET_SHADER(init)) != 0) return 1;
-	if (create_program(&program_step, GET_SHADER(vertex), GET_SHADER(step)) != 0) return 2;
-	if (create_program(&program_draw, GET_SHADER(vertex), GET_SHADER(draw)) != 0) return 3;
+	if (shader_vertex.loadSource(GET_SHADER(vertex)) != 0) return 1;
+	if (shader_init.loadSource(GET_SHADER(init)) != 0) return 1;
+	if (shader_step.loadSource(GET_SHADER(step)) != 0) return 1;
+	if (shader_draw.loadSource(GET_SHADER(draw)) != 0) return 1;
 
-	if (create_palette(&palette) != 0) return 4;
-	if (!create_textures()) return 5;
+	program_init.attachShader(shader_vertex);
+	program_init.attachShader(shader_init);
+
+	program_step.attachShader(shader_vertex);
+	program_step.attachShader(shader_step);
+
+	program_draw.attachShader(shader_vertex);
+	program_draw.attachShader(shader_draw);
+
+	create_palette();
+	create_textures();
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, palette);
+	palette.bind();
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -327,26 +217,11 @@ static int initGL() {
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-	GLint position = glGetAttribLocation(program_init.program_id, "position");
+	GLint position = program_init.getAttribLoc("position");
 	glEnableVertexAttribArray(position);
 	glVertexAttribPointer(position, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
 
 	return 0;
-}
-
-static void set_uniform_i(GLuint program_id, const char *name, int value) {
-	int location = glGetUniformLocation(program_id, name);
-	glUniform1i(location, value);
-}
-
-static void set_uniform_f(GLuint program_id, const char *name, float value) {
-	int location = glGetUniformLocation(program_id, name);
-	glUniform1f(location, value);
-}
-
-static void set_uniform_vec2(GLuint program_id, const char *name, vec2 value) {
-	int location = glGetUniformLocation(program_id, name);
-	glUniform2f(location, value.x, value.y);
 }
 
 static void reset_mandelbrot() {
@@ -358,50 +233,45 @@ static void reset_mandelbrot() {
 static void redraw_mandelbrot() {
 	current_tex = 0;
 	iteration = 0.f;
+	float ratio = (float) window_width / window_height;
 
-	glUseProgram(program_init.program_id);
-	set_uniform_vec2(program_init.program_id, "center", center);
-	set_uniform_f(program_init.program_id, "scale", scale);
-	set_uniform_f(program_init.program_id, "ratio", get_ratio());
+	program_init.setUniform("center", center);
+	program_init.setUniform("scale", scale);
+	program_init.setUniform("ratio", ratio);
 
-	glUseProgram(program_step.program_id);
-	set_uniform_vec2(program_step.program_id, "center", center);
-	set_uniform_f(program_step.program_id, "scale", scale);
-	set_uniform_f(program_step.program_id, "ratio", get_ratio());
+	program_step.setUniform("center", center);
+	program_step.setUniform("scale", scale);
+	program_step.setUniform("ratio", ratio);
 
-	glUseProgram(program_draw.program_id);
-	set_uniform_vec2(program_draw.program_id, "center", center);
-	set_uniform_f(program_draw.program_id, "scale", scale);
-	set_uniform_f(program_draw.program_id, "ratio", get_ratio());
+	program_draw.setUniform("center", center);
+	program_draw.setUniform("scale", scale);
+	program_draw.setUniform("ratio", ratio);
 }
 
 static void render() {
-	glViewport(0, 0, tex_width, tex_height);
-
 	glActiveTexture(GL_TEXTURE1);
 	switch (current_tex) {
 	case 0:
-		glBindFramebuffer(GL_FRAMEBUFFER, tex1.fbo);
-		glUseProgram(program_init.program_id);
-		glBindTexture(GL_TEXTURE_2D, 0);
+		targets[0].bind();
+		program_init.bind();
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		current_tex = 1;
 		break;
 	case 1:
-		glBindFramebuffer(GL_FRAMEBUFFER, tex2.fbo);
-		glUseProgram(program_step.program_id);
-		set_uniform_i(program_step.program_id, "in_texture", 1);
-		set_uniform_f(program_step.program_id, "iteration", iteration);
-		glBindTexture(GL_TEXTURE_2D, tex1.tex);
+		targets[1].bind();
+		program_step.bind();
+		program_step.setUniform("in_texture", 1);
+		program_step.setUniform("iteration", iteration);
+		textures[0].bind();
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		current_tex = 2;
 		break;
 	case 2:
-		glBindFramebuffer(GL_FRAMEBUFFER, tex1.fbo);
-		glUseProgram(program_step.program_id);
-		set_uniform_i(program_step.program_id, "in_texture", 1);
-		set_uniform_f(program_step.program_id, "iteration", iteration);
-		glBindTexture(GL_TEXTURE_2D, tex2.tex);
+		targets[0].bind();
+		program_step.bind();
+		program_step.setUniform("in_texture", 1);
+		program_step.setUniform("iteration", iteration);
+		textures[1].bind();
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		current_tex = 1;
 		break;
@@ -409,28 +279,18 @@ static void render() {
 
 	iteration += 1.f;
 
-	glViewport(0, 0, window_width, window_height);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glUseProgram(program_draw.program_id);
-	set_uniform_i(program_draw.program_id, "in_texture", 1);
-	set_uniform_i(program_draw.program_id, "outside_palette", 0);
-	glBindTexture(GL_TEXTURE_2D, current_tex == 1 ? tex1.tex : tex2.tex);
+	render_target::bindScreen(window_width, window_height);
+	program_draw.bind();
+	program_draw.setUniform("in_texture", 1);
+	program_draw.setUniform("outside_palette", 0);
+	program_draw.setUniform("log_coeff", log_coeff);
+	textures[current_tex - 1].bind();
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
 static void cleanupGL() {
 	glDeleteVertexArrays(1, &vao);
 	glDeleteBuffers(1, &vbo);
-
-	free_program(&program_init);
-	free_program(&program_step);
-	free_program(&program_draw);
-
-	free_texture(&tex1);
-	free_texture(&tex2);
-
-	glDeleteTextures(1, &palette);
 }
 
 GLFWwindow *createTheWindow() {
@@ -468,7 +328,7 @@ int main(int argc, char**argv) {
 
 	glfwMakeContextCurrent(window);
 
-	glfwSwapInterval(0);
+	glfwSwapInterval(1);
 
 	glewExperimental = true;
 	GLenum error = glewInit();
