@@ -17,14 +17,12 @@ public:
 	void setWrap(GLenum value);
 
 private:
-	GLuint texture_id;
+	GLuint texture_id = 0;
 
 	friend class render_target;
 };
 
-texture::texture(int width, int height) : width(width), height(height) {
-	glGenTextures(1, &texture_id);
-}
+texture::texture(int width, int height) : width(width), height(height) {}
 
 texture::~texture() {
 	if (texture_id) {
@@ -38,6 +36,8 @@ void texture::bind() {
 }
 
 void texture::attachPixels(GLint internalFormat, GLenum format, GLenum type, const GLvoid *data) {
+	glGenTextures(1, &texture_id);
+
 	bind();
 	glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, data);
 	setFilter(GL_NEAREST);

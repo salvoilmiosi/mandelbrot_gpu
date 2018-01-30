@@ -23,9 +23,17 @@ private:
 	friend class program;
 };
 
-shader::shader(const char *name, GLenum type) : name(name), type(type) {
-	shader_id = glCreateShader(type);
-}
+class vertex_shader : public shader {
+public:
+	vertex_shader(const char *name) : shader(name, GL_VERTEX_SHADER) {}
+};
+
+class frag_shader : public shader {
+public:
+	frag_shader(const char *name) : shader(name, GL_FRAGMENT_SHADER) {}
+};
+
+shader::shader(const char *name, GLenum type) : name(name), type(type) {}
 
 shader::~shader() {
 	if (shader_id) {
@@ -35,6 +43,8 @@ shader::~shader() {
 }
 
 int shader::loadSource(const std::string &source) {
+	shader_id = glCreateShader(type);
+
 	int vertex_source_length = source.size();
 	const char *source_c_str = source.c_str();
 	glShaderSource(shader_id, 1, &source_c_str, &vertex_source_length);

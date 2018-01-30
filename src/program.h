@@ -20,6 +20,13 @@ public:
 
 	void attachShader(shader &s);
 	void link();
+
+	template<typename ... Ts>
+	void attachAndLink(Ts& ... s) {
+		(attachShader(s), ...);
+		link();
+	}
+
 	void bind();
 
 	template<typename T>
@@ -37,9 +44,7 @@ private:
 	int uni_loc(const char *name);
 };
 
-program::program(const char *name) : name(name) {
-	program_id = glCreateProgram();
-}
+program::program(const char *name) : name(name) {}
 
 program::~program() {
 	for (auto &s : shaders) {
@@ -53,6 +58,10 @@ program::~program() {
 }
 
 void program::attachShader(shader &s) {
+	if (!program_id) {
+		program_id = glCreateProgram();
+	}
+
 	shaders.push_back(&s);
 
 	glAttachShader(program_id, s.shader_id);
