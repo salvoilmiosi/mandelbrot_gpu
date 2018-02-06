@@ -350,9 +350,8 @@ static void set_uniform_vec2(GLuint program_id, const char *name, vec2 value) {
 }
 
 static void reset_mandelbrot() {
-	center.x = -0.5f;
-	center.y = 0.f;
-	scale = 1.2f;
+	center = {0.f, 0.f};
+	scale = 1.5f;
 }
 
 static void redraw_mandelbrot() {
