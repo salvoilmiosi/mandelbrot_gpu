@@ -1,15 +1,12 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
+#include <iostream>
 #include <string>
 #include <vector>
-#include <math.h>
+#include <cmath>
 
 #include "sources.h"
-
 #include "program.h"
 #include "render_target.h"
 
@@ -43,27 +40,19 @@ vec2 center;
 float scale;
 float log_coeff = 0.03f;
 
-int check_gl_error(const char *msg) {
-	GLenum err = glGetError();
-	if (err != GL_NO_ERROR) {
-		fprintf(stderr, "OpenGL error %d %s\n", err, msg);
-	}
-	return err;
-}
-
 static uint32_t color_rgba(int r, int g, int b, int a = 0xff) {
 	return ((r & 0xff) |
-			((g & 0xff) << 8) |
-			((b & 0xff) << 16) |
-			((a & 0xff) << 24));
+		   ((g & 0xff) << 8) |
+		   ((b & 0xff) << 16) |
+		   ((a & 0xff) << 24));
 }
 
 static void create_palette() {
 	uint32_t colors[N_COLORS];
 	for (int i=0; i<N_COLORS; ++i) {
-		double red   = sin(i * 0.3) * 0x80 + 0x80;
-		double green = sin(i * 0.2) * 0x80 + 0x80;
-		double blue  = sin(i * 0.5) * 0x80 + 0x80;
+		int red   = sin(i * 0.3) * 0x80 + 0x80;
+		int green = sin(i * 0.2) * 0x80 + 0x80;
+		int blue  = sin(i * 0.5) * 0x80 + 0x80;
 		colors[i] = color_rgba(red, green, blue);
 	}
 
@@ -72,7 +61,6 @@ static void create_palette() {
 }
 
 static int next_pow_2(int num) {
-	//return num;
 	int n = 1;
 	while (n < num) {
 		n *= 2;
@@ -106,8 +94,7 @@ static int initGL() {
 	create_palette();
 	create_textures();
 
-	glActiveTexture(GL_TEXTURE0);
-	palette.bind();
+	palette.bindToSampler(0);
 
 	float vertices[] = {
 		-1.0,  1.0,
@@ -132,8 +119,7 @@ static int initGL() {
 }
 
 static void reset_mandelbrot() {
-	center.x = -0.5f;
-	center.y = 0.f;
+	center = {-0.5f, 0.f};
 	scale = 1.2f;
 }
 
@@ -156,7 +142,7 @@ static void redraw_mandelbrot() {
 }
 
 static void error_callback(int error, const char *description) {
-	fprintf(stderr, "GLFW error %d: %s\n", error, description);
+	std::cerr << "GLFW error " << error << " : " << description << std::endl;
 }
 
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
@@ -226,6 +212,8 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 			redraw_mandelbrot();
 			break;
 		}
+		default:
+			break;
 		}
 		break;
 	}
@@ -239,29 +227,28 @@ static void resize_callback(GLFWwindow *window, int width, int height) {
 }
 
 static void render() {
-	glActiveTexture(GL_TEXTURE1);
 	switch (current_tex) {
 	case 0:
-		targets[0].bind();
 		program_init.bind();
+		targets[0].bind();
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		current_tex = 1;
 		break;
 	case 1:
-		targets[1].bind();
 		program_step.bind();
 		program_step.setUniform("in_texture", 1);
 		program_step.setUniform("iteration", iteration);
-		textures[0].bind();
+		textures[0].bindToSampler(1);
+		targets[1].bind();
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		current_tex = 2;
 		break;
 	case 2:
-		targets[0].bind();
 		program_step.bind();
 		program_step.setUniform("in_texture", 1);
 		program_step.setUniform("iteration", iteration);
-		textures[1].bind();
+		textures[1].bindToSampler(1);
+		targets[0].bind();
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		current_tex = 1;
 		break;
@@ -269,12 +256,13 @@ static void render() {
 
 	iteration += 1.f;
 
-	render_target::bindScreen(window_width, window_height);
 	program_draw.bind();
 	program_draw.setUniform("in_texture", 1);
 	program_draw.setUniform("outside_palette", 0);
 	program_draw.setUniform("log_coeff", log_coeff);
 	textures[current_tex - 1].bind();
+
+	render_target::bindScreen(window_width, window_height);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
@@ -323,7 +311,7 @@ int main(int argc, char**argv) {
 	glewExperimental = true;
 	GLenum error = glewInit();
 	if (error != GLEW_OK) {
-		fprintf(stderr, "GLEW error %d: %s\n", error, glewGetErrorString(error));
+		std::cerr << "GLEW error " << error << " : " << glewGetErrorString(error) << std::endl;
 		glfwTerminate();
 		return 2;
 	}

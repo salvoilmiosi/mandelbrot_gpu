@@ -12,6 +12,8 @@ public:
 	const int height;
 
 	void bind();
+	void bindToSampler(int n);
+
 	void attachPixels(GLint internalFormat, GLenum format, GLenum type, const GLvoid *data);
 	void setFilter(GLenum value);
 	void setWrap(GLenum value);
@@ -33,6 +35,11 @@ texture::~texture() {
 
 void texture::bind() {
 	glBindTexture(GL_TEXTURE_2D, texture_id);
+}
+
+void texture::bindToSampler(int n) {
+	glActiveTexture(GL_TEXTURE0 + n);
+	bind();
 }
 
 void texture::attachPixels(GLint internalFormat, GLenum format, GLenum type, const GLvoid *data) {
