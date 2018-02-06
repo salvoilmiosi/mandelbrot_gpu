@@ -119,7 +119,7 @@ static int initGL() {
 }
 
 static void reset_mandelbrot() {
-	center = {-0.5f, 0.f};
+	center = {-0.f, 0.f};
 	scale = 1.2f;
 }
 
@@ -260,7 +260,7 @@ static void render() {
 	program_draw.setUniform("in_texture", 1);
 	program_draw.setUniform("outside_palette", 0);
 	program_draw.setUniform("log_coeff", log_coeff);
-	textures[current_tex - 1].bind();
+	//textures[current_tex - 1].bind();
 
 	render_target::bindScreen(window_width, window_height);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -306,7 +306,7 @@ int main(int argc, char**argv) {
 
 	glfwMakeContextCurrent(window);
 
-	glfwSwapInterval(1);
+	glfwSwapInterval(0);
 
 	glewExperimental = true;
 	GLenum error = glewInit();

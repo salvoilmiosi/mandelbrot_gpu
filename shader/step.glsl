@@ -17,7 +17,11 @@ void main() {
 	if (dot(z, z) > 4.0) {
 		gl_FragColor = in_color;
 	} else {
-		gl_FragColor.xy = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + point_c;
+		float a = z.x;
+		float b = z.y;
+		//gl_FragColor.xy = vec2(a*a - b*b, 2.0*a*b) + point_c;
+		//gl_FragColor.xy = vec2(a*a*a - 3.0*a*b*b, 3.0*a*a*b - b*b*b) + point_c;
+		gl_FragColor.xy = vec2(a*a*a*a - 6.0*a*a*b*b + b*b*b*b, 4.0*a*a*a*b - 4.0*a*b*b*b) + point_c;
 		gl_FragColor.z = iteration;
 		gl_FragColor.w = 0.0;
 	}
