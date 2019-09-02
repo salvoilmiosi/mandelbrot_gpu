@@ -27,6 +27,8 @@ struct vec2 {
 
 vec2 center;
 float scale;
+bool julia = false;
+vec2 point_c_const;
 
 static void reset_mandelbrot();
 static void redraw_mandelbrot();
@@ -43,6 +45,10 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			break;
 		case GLFW_KEY_SPACE:
+			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_J:
+			julia = !julia;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_R:
@@ -62,6 +68,19 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 	}
 }
 
+static vec2 mouse_pt_to_scale(double mouse_x, double mouse_y) {
+	vec2 pt = center;
+	double scale_len = 2 * scale / window_height;
+
+	double dx_to_center = mouse_x - (window_width / 2);
+	double dy_to_center = mouse_y - (window_height / 2);
+
+	pt.x += (double) dx_to_center * scale_len;
+	pt.y -= (double) dy_to_center * scale_len;
+
+	return pt;
+}
+
 static void mouse_button_callback(GLFWwindow *window, int button, int action, int mods) {
 	double mouse_x, mouse_y;
 
@@ -78,22 +97,31 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 			break;
 		case GLFW_RELEASE:
 		{
-			double scale_len = 2 * scale / window_height;
+			center = mouse_pt_to_scale(press_x, press_y);
 
-			double dx_to_center = press_x - (window_width / 2);
-			double dy_to_center = press_y - (window_height / 2);
+			if (mouse_x == press_x && mouse_y == press_y) {
+				scale *= 0.25;
+			} else {
+				double scale_len = 2 * scale / window_height;
 
-			center.x += (double) dx_to_center * scale_len;
-			center.y -= (double) dy_to_center * scale_len;
+				double dx_to_start = press_x < mouse_x ? mouse_x - press_x : press_x - mouse_x;
+				double dy_to_start = press_y < mouse_y ? mouse_y - press_y : press_y - mouse_y;
 
-			double dx_to_start = press_x < mouse_x ? mouse_x - press_x : press_x - mouse_x;
-			double dy_to_start = press_y < mouse_y ? mouse_y - press_y : press_y - mouse_y;
-
-			scale = dx_to_start > dy_to_start ? dx_to_start * scale_len : dy_to_start * scale_len;
+				scale = sqrt(dx_to_start*dx_to_start + dy_to_start * dy_to_start) * scale_len;
+			}
 
 			redraw_mandelbrot();
 			break;
 		}
+		}
+		break;
+	case GLFW_MOUSE_BUTTON_RIGHT:
+		switch (action) {
+		case GLFW_PRESS:
+			point_c_const = mouse_pt_to_scale(mouse_x, mouse_y);
+			julia = true;
+			redraw_mandelbrot();
+			break;
 		}
 		break;
 	}
@@ -358,12 +386,20 @@ static void redraw_mandelbrot() {
 	current_tex = 0;
 	iteration = 0.f;
 
+	vec2 julia_pt = {0.0, 0.0};
+	if (julia) {
+		julia_pt = point_c_const;
+	}
+
 	glUseProgram(program_init.program_id);
 	set_uniform_vec2(program_init.program_id, "center", center);
 	set_uniform_f(program_init.program_id, "scale", scale);
 	set_uniform_f(program_init.program_id, "ratio", get_ratio());
 
 	glUseProgram(program_step.program_id);
+
+	set_uniform_vec2(program_step.program_id, "point_c_const", julia_pt);
+
 	set_uniform_vec2(program_step.program_id, "center", center);
 	set_uniform_f(program_step.program_id, "scale", scale);
 	set_uniform_f(program_step.program_id, "ratio", get_ratio());
