@@ -28,7 +28,12 @@ struct vec2 {
 vec2 center;
 float scale;
 bool julia = false;
-vec2 point_c_const;
+bool vsync = false;
+
+vec2 point_c_const = {-0.4, 0.6};
+
+float log_multiplier = 0.5;
+float log_shift = 3.0;
 
 static void reset_mandelbrot();
 static void redraw_mandelbrot();
@@ -37,9 +42,17 @@ static void error_callback(int error, const char *description) {
 	fprintf(stderr, "GLFW error %d: %s\n", error, description);
 }
 
+static void move_point_c_polar(float x_mul, float y_mul) {
+	double theta = atan2(point_c_const.y, point_c_const.x);
+	double modulo = sqrt(point_c_const.x * point_c_const.x + point_c_const.y * point_c_const.y);
+	theta -= x_mul * 0.02;
+	modulo *= 1.0 + y_mul * 0.02;
+	point_c_const.x = (float)(cos(theta) * modulo);
+	point_c_const.y = (float)(sin(theta) * modulo);
+}
+
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
-	switch (action) {
-	case GLFW_PRESS:
+	if (action == GLFW_PRESS) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE:
 			glfwSetWindowShouldClose(window, GL_TRUE);
@@ -55,6 +68,10 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			reset_mandelbrot();
 			redraw_mandelbrot();
 			break;
+		case GLFW_KEY_G:
+			vsync = !vsync;
+			glfwSwapInterval(vsync);
+			break;
 		case GLFW_KEY_PAGE_UP:
 			scale *= 0.5f;
 			redraw_mandelbrot();
@@ -64,7 +81,61 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			redraw_mandelbrot();
 			break;
 		}
-		break;
+	}
+	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+		switch(key) {
+		case GLFW_KEY_Z:
+			log_multiplier *= 1.1;
+			break;
+		case GLFW_KEY_X:
+			log_multiplier /= 1.1;
+			break;
+		case GLFW_KEY_C:
+			log_shift -= 0.1;
+			if (log_shift < 1.0) {
+				log_shift = 1.0;
+			}
+			break;
+		case GLFW_KEY_V:
+			log_shift += 0.1;
+			break;
+		case GLFW_KEY_W:
+			center.y += 0.1 * scale;
+			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_A:
+			center.x -= 0.1 * scale;
+			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_S:
+			center.y -= 0.1 * scale;
+			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_D:
+			center.x += 0.1 * scale;
+			redraw_mandelbrot();
+			break;
+		}
+		if (julia) {
+			switch(key) {
+			case GLFW_KEY_UP:
+				move_point_c_polar(0.0, 1.0);
+				redraw_mandelbrot();
+				break;
+			case GLFW_KEY_LEFT:
+				move_point_c_polar(-1.0, 0.00);
+				redraw_mandelbrot();
+				break;
+			case GLFW_KEY_DOWN:
+				move_point_c_polar(0.0, -1.0);
+				redraw_mandelbrot();
+				break;
+			case GLFW_KEY_RIGHT:
+				move_point_c_polar(1.0, 0.0);
+				redraw_mandelbrot();
+				break;
+			}
+		}
 	}
 }
 
@@ -99,9 +170,7 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 		{
 			center = mouse_pt_to_scale(press_x, press_y);
 
-			if (mouse_x == press_x && mouse_y == press_y) {
-				scale *= 0.25;
-			} else {
+			if (mouse_x != press_x || mouse_y != press_y) {
 				double scale_len = 2 * scale / window_height;
 
 				double dx_to_start = press_x < mouse_x ? mouse_x - press_x : press_x - mouse_x;
@@ -238,14 +307,23 @@ static uint32_t color_rgba(int r, int g, int b, int a = 0xff) {
 }
 
 static int create_palette(GLuint *id) {
-	static const int N_COLORS = 256;
+	static const uint32_t palette[] = {
+		color_rgba(0x00,0x00,0xff),
+		color_rgba(0x00,0xff,0xff),
+		color_rgba(0x00,0xff,0x00),
+		color_rgba(0xff,0xff,0x00),
+		color_rgba(0xff,0x00,0x00),
+		color_rgba(0xff,0x00,0xff)
+	};
 
+	static const int PALETTE_SIZE = sizeof(palette) / sizeof(*palette);
+	static const int N_COLORS = 21;
 	uint32_t colors[N_COLORS];
-	for (int i=0; i<N_COLORS; ++i) {
-		double red   = sin(i * 0.3) * 0x80 + 0x80;
-		double green = sin(i * 0.2) * 0x80 + 0x80;
-		double blue  = sin(i * 0.5) * 0x80 + 0x80;
-		colors[i] = color_rgba(red, green, blue);
+
+	colors[0] = color_rgba(0xff,0xff,0xff);
+	colors[N_COLORS-1] = color_rgba(0xff,0xff,0xff);
+	for (int i=1; i<N_COLORS-1; ++i) {
+		colors[i] = palette[(i-1)%PALETTE_SIZE];
 	}
 
 	glGenTextures(1, id);
@@ -450,6 +528,8 @@ static void render() {
 	glUseProgram(program_draw.program_id);
 	set_uniform_i(program_draw.program_id, "in_texture", 1);
 	set_uniform_i(program_draw.program_id, "outside_palette", 0);
+	set_uniform_f(program_draw.program_id, "log_multiplier", log_multiplier);
+	set_uniform_f(program_draw.program_id, "log_shift", log_shift);
 	glBindTexture(GL_TEXTURE_2D, current_tex == 1 ? tex1.tex : tex2.tex);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
