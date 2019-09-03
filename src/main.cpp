@@ -300,10 +300,6 @@ static int create_program(shader_program *program, const char *vertex_source, co
 	return 0;
 }
 
-static int create_program(shader_program *program, const std::string &vertex_source, const std::string &fragment_source) {
-	return create_program(program, vertex_source.c_str(), fragment_source.c_str());
-}
-
 static void free_program(shader_program *program) {
 	glDetachShader(program->program_id, program->vertex_shader);
 	glDeleteShader(program->vertex_shader);
@@ -439,13 +435,25 @@ static void resize_callback(GLFWwindow *window, int width, int height) {
 }
 
 static int initGL() {
-	if (create_program(&program_init, GET_SHADER(vertex), GET_SHADER(init)) != 0) return 1;
-	if (create_program(&program_step, GET_SHADER(vertex), GET_SHADER(step)) != 0) return 2;
-	if (create_program(&program_draw, GET_SHADER(vertex), GET_SHADER(draw)) != 0) return 3;
-	if (create_program(&program_final, GET_SHADER(vertex), GET_SHADER(final)) != 0) return 3;
+	char *vertex_source = GET_SHADER(vertex);
+	char *init_source = GET_SHADER(init);
+	char *step_source = GET_SHADER(step);
+	char *draw_source = GET_SHADER(draw);
+	char *final_source = GET_SHADER(final);
 
-	if (create_palette(&palette) != 0) return 4;
-	if (!create_textures()) return 5;
+	if (create_program(&program_init, vertex_source, init_source) != 0) return 1;
+	if (create_program(&program_step, vertex_source, step_source) != 0) return 1;
+	if (create_program(&program_draw, vertex_source, draw_source) != 0) return 1;
+	if (create_program(&program_final, vertex_source, final_source) != 0) return 1;
+
+	free(vertex_source);
+	free(init_source);
+	free(step_source);
+	free(draw_source);
+	free(final_source);
+
+	if (create_palette(&palette) != 0) return 2;
+	if (!create_textures()) return 2;
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, palette);
