@@ -17,5 +17,6 @@ SHADER_DECLARE(vertex);
 SHADER_DECLARE(init);
 SHADER_DECLARE(step);
 SHADER_DECLARE(draw);
+SHADER_DECLARE(final);
 
 #endif // __SOURCES_H__

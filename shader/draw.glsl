@@ -14,7 +14,7 @@ uniform float log_multiplier;
 uniform float log_shift;
 
 void main() {
-	vec4 in_color = texture2D(in_texture, tex_coords);
+	vec4 in_color = texture2D(in_texture, vec2(tex_coords.x, 1.0 - tex_coords.y));
 	vec2 point_z = in_color.xy;
 
 	if (dot(point_z, point_z) < 4.0) {

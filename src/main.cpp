@@ -9,6 +9,8 @@
 
 #include "sources.h"
 
+int save_bmp(const char *filename, const void *data, int width, int height);
+
 static const char *WINDOW_TITLE = "Mandelbrot";
 
 static int window_width = 800;
@@ -29,11 +31,12 @@ vec2 center;
 float scale;
 bool julia = false;
 bool vsync = false;
+bool save_tex = false;
 
 vec2 point_c_const = {-0.4, 0.6};
 
-float log_multiplier = 0.5;
-float log_shift = 3.0;
+float log_multiplier = 0.3;
+float log_shift = 6.0;
 
 static void reset_mandelbrot();
 static void redraw_mandelbrot();
@@ -79,6 +82,15 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 		case GLFW_KEY_PAGE_DOWN:
 			scale *= 2.f;
 			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_P:
+			printf("center = (%f, %f)\nscale = %f\npoint_c_const = (%f, %f)\n", center.x, center.y, scale, point_c_const.x, point_c_const.y);
+			break;
+		case GLFW_KEY_B:
+			printf("log_multipler = %f\nlog_shift = %f\n", log_multiplier, log_shift);
+			break;
+		case GLFW_KEY_F12:
+			save_tex = true;
 			break;
 		}
 	}
@@ -215,6 +227,7 @@ struct shader_program {
 shader_program program_init("init");
 shader_program program_step("step");
 shader_program program_draw("draw");
+shader_program program_final("final");
 
 struct texture_io {
 	GLuint tex = 0;
@@ -224,12 +237,12 @@ struct texture_io {
 
 GLuint palette;
 
-texture_io tex1, tex2;
+texture_io tex1, tex2, tex_out;
 
 int check_gl_error(const char *msg) {
 	GLenum err = glGetError();
 	if (err != GL_NO_ERROR) {
-		fprintf(stderr, "OpenGL error %d %s\n", err, msg);
+		fprintf(stderr, "OpenGL error %x %s\n", err, msg);
 	}
 	return err;
 }
@@ -299,11 +312,30 @@ static void free_program(shader_program *program) {
 	glDeleteProgram(program->program_id);
 }
 
-static uint32_t color_rgba(int r, int g, int b, int a = 0xff) {
+static uint32_t color_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 0xff) {
 	return ((r & 0xff) |
 			((g & 0xff) << 8) |
 			((b & 0xff) << 16) |
 			((a & 0xff) << 24));
+}
+
+static uint32_t color_fade(uint32_t color_a, uint32_t color_b, float amt) {
+	uint8_t ar = color_a & 0xff;
+	uint8_t ag = (color_a & 0xff00) >> 8;
+	uint8_t ab = (color_a & 0xff0000) >> 16;
+	uint8_t aa = (color_a & 0xff000000) >> 24;
+
+	uint8_t br = color_b & 0xff;
+	uint8_t bg = (color_b & 0xff00) >> 8;
+	uint8_t bb = (color_b & 0xff0000) >> 16;
+	uint8_t ba = (color_b & 0xff000000) >> 24;
+
+	uint8_t cr = (br - ar) * amt + ar;
+	uint8_t cg = (bg - ag) * amt + ag;
+	uint8_t cb = (bb - ab) * amt + ab;
+	uint8_t ca = (ba - aa) * amt + aa;
+
+	return color_rgba(cr, cg, cb, ca);
 }
 
 static int create_palette(GLuint *id) {
@@ -317,13 +349,13 @@ static int create_palette(GLuint *id) {
 	};
 
 	static const int PALETTE_SIZE = sizeof(palette) / sizeof(*palette);
-	static const int N_COLORS = 21;
+	static const int N_COLORS = 22;
 	uint32_t colors[N_COLORS];
 
 	colors[0] = color_rgba(0xff,0xff,0xff);
 	colors[N_COLORS-1] = color_rgba(0xff,0xff,0xff);
 	for (int i=1; i<N_COLORS-1; ++i) {
-		colors[i] = palette[(i-1)%PALETTE_SIZE];
+		colors[i] = color_fade(palette[(i-1)%PALETTE_SIZE], color_rgba(0xff,0xff,0xff), pow(i / (float) N_COLORS, 5));
 	}
 
 	glGenTextures(1, id);
@@ -344,14 +376,14 @@ static void free_texture(texture_io *io) {
 	glDeleteRenderbuffers(1, &io->rbo);
 }
 
-static int create_texture(texture_io *io, int width, int height) {
+static int create_texture(texture_io *io, int width, int height, GLint format, GLenum type) {
 	if (&io->tex) {
 		free_texture(io);
 	}
 
 	glGenTextures(1, &io->tex);
 	glBindTexture(GL_TEXTURE_2D, io->tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, GL_RGBA, type, 0);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -393,8 +425,9 @@ static int next_pow_2(int num) {
 static bool create_textures() {
 	tex_width = next_pow_2(window_width);
 	tex_height = next_pow_2(window_height);
-	if (create_texture(&tex1, tex_width, tex_height) != 0) return false;
-	if (create_texture(&tex2, tex_width, tex_height) != 0) return false;
+	if (create_texture(&tex1, tex_width, tex_height, GL_RGBA32F, GL_FLOAT) != 0) return false;
+	if (create_texture(&tex2, tex_width, tex_height, GL_RGBA32F, GL_FLOAT) != 0) return false;
+	if (create_texture(&tex_out, tex_width, tex_height, GL_RGBA, GL_UNSIGNED_BYTE) != 0) return false;
 	return true;
 }
 
@@ -409,6 +442,7 @@ static int initGL() {
 	if (create_program(&program_init, GET_SHADER(vertex), GET_SHADER(init)) != 0) return 1;
 	if (create_program(&program_step, GET_SHADER(vertex), GET_SHADER(step)) != 0) return 2;
 	if (create_program(&program_draw, GET_SHADER(vertex), GET_SHADER(draw)) != 0) return 3;
+	if (create_program(&program_final, GET_SHADER(vertex), GET_SHADER(final)) != 0) return 3;
 
 	if (create_palette(&palette) != 0) return 4;
 	if (!create_textures()) return 5;
@@ -522,15 +556,41 @@ static void render() {
 
 	iteration += 1.f;
 
-	glViewport(0, 0, window_width, window_height);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, tex_out.fbo);
 	glUseProgram(program_draw.program_id);
 	set_uniform_i(program_draw.program_id, "in_texture", 1);
 	set_uniform_i(program_draw.program_id, "outside_palette", 0);
 	set_uniform_f(program_draw.program_id, "log_multiplier", log_multiplier);
 	set_uniform_f(program_draw.program_id, "log_shift", log_shift);
 	glBindTexture(GL_TEXTURE_2D, current_tex == 1 ? tex1.tex : tex2.tex);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+	if (save_tex) {
+		save_tex = false;
+		
+		size_t bufsize = tex_width * tex_height * 3;
+		GLubyte *data = (GLubyte*) malloc(bufsize);
+
+		glBindTexture(GL_TEXTURE_2D, tex_out.tex);
+		glGetnTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, bufsize, data);
+
+		if (check_gl_error("Could not read texture") == 0) {
+			const char *filename = "screenshot.data";
+
+			if (save_bmp(filename, data, tex_width, tex_height) == 0) {
+				printf("Saved screenshot to %s (%d x %d)\n", filename, tex_width, tex_height);
+			}
+		}
+
+		free(data);
+	}
+
+	glViewport(0, 0, window_width, window_height);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glUseProgram(program_final.program_id);
+	set_uniform_i(program_final.program_id, "in_texture", 1);
+	glBindTexture(GL_TEXTURE_2D, tex_out.tex);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
