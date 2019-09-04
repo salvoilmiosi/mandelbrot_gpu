@@ -22,6 +22,8 @@ static int tex_height;
 int current_tex = 0;
 float iteration = 0.f;
 
+const int NUM_ITERATIONS = 10;
+
 struct vec2 {
 	float x;
 	float y;
@@ -33,13 +35,14 @@ bool julia = false;
 bool vsync = false;
 bool save_tex = false;
 
-vec2 point_c_const = {-0.4, 0.6};
+vec2 point_c_const = {0.0, 0.0};
 
 float log_multiplier = 0.3;
 float log_shift = 6.0;
 
 static void reset_mandelbrot();
 static void redraw_mandelbrot();
+static int create_palette();
 
 static void error_callback(int error, const char *description) {
 	fprintf(stderr, "GLFW error %d: %s\n", error, description);
@@ -48,8 +51,8 @@ static void error_callback(int error, const char *description) {
 static void move_point_c_polar(float x_mul, float y_mul) {
 	double theta = atan2(point_c_const.y, point_c_const.x);
 	double modulo = sqrt(point_c_const.x * point_c_const.x + point_c_const.y * point_c_const.y);
-	theta -= x_mul * 0.02;
-	modulo *= 1.0 + y_mul * 0.02;
+	theta -= x_mul * 0.01;
+	modulo *= 1.0 + y_mul * 0.01;
 	point_c_const.x = (float)(cos(theta) * modulo);
 	point_c_const.y = (float)(sin(theta) * modulo);
 }
@@ -89,6 +92,9 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 		case GLFW_KEY_B:
 			printf("log_multipler = %f\nlog_shift = %f\n", log_multiplier, log_shift);
 			break;
+		case GLFW_KEY_L:
+			create_palette();
+			break;
 		case GLFW_KEY_F12:
 			save_tex = true;
 			break;
@@ -97,10 +103,10 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
 		switch(key) {
 		case GLFW_KEY_Z:
-			log_multiplier *= 1.1;
+			log_multiplier /= 1.1;
 			break;
 		case GLFW_KEY_X:
-			log_multiplier /= 1.1;
+			log_multiplier *= 1.1;
 			break;
 		case GLFW_KEY_C:
 			log_shift -= 0.1;
@@ -235,7 +241,7 @@ struct texture_io {
 	GLuint rbo = 0;
 };
 
-GLuint palette;
+GLuint palette = 0; // palette texture
 
 texture_io tex1, tex2, tex_out;
 
@@ -334,8 +340,8 @@ static uint32_t color_fade(uint32_t color_a, uint32_t color_b, float amt) {
 	return color_rgba(cr, cg, cb, ca);
 }
 
-static int create_palette(GLuint *id) {
-	static const uint32_t palette[] = {
+static int create_palette() {
+	static const uint32_t rainbow[] = {
 		color_rgba(0x00,0x00,0xff),
 		color_rgba(0x00,0xff,0xff),
 		color_rgba(0x00,0xff,0x00),
@@ -343,25 +349,30 @@ static int create_palette(GLuint *id) {
 		color_rgba(0xff,0x00,0x00),
 		color_rgba(0xff,0x00,0xff)
 	};
-
-	static const int PALETTE_SIZE = sizeof(palette) / sizeof(*palette);
-	static const int N_COLORS = 22;
+	static const int N_RAINBOW = sizeof(rainbow) / sizeof(*rainbow);
+	static const int N_COLORS = 64;
 	uint32_t colors[N_COLORS];
 
 	colors[0] = color_rgba(0xff,0xff,0xff);
 	colors[N_COLORS-1] = color_rgba(0xff,0xff,0xff);
 	for (int i=1; i<N_COLORS-1; ++i) {
-		colors[i] = color_fade(palette[(i-1)%PALETTE_SIZE], color_rgba(0xff,0xff,0xff), pow(i / (float) N_COLORS, 5));
+		colors[i] = color_rgba(rand()%0xff, rand()%0xff, rand()%0xff);
+		colors[i] = color_fade(colors[i], rainbow[(i-1)%N_RAINBOW], 0.6);
+		//colors[i] = color_fade(colors[i], color_rgba(0xff,0xff,0xff), pow(i / (float)N_COLORS, 5));
 	}
 
-	glGenTextures(1, id);
-	glBindTexture(GL_TEXTURE_2D, *id);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, N_COLORS, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, colors);
+	if (!palette) {
+		glGenTextures(1, &palette);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, palette);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	}
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D, palette);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, N_COLORS, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, colors);
 
 	return 0;
 }
@@ -410,7 +421,6 @@ static int create_texture(texture_io *io, int width, int height, GLint format, G
 }
 
 static int next_pow_2(int num) {
-	//return num;
 	int n = 1;
 	while (n < num) {
 		n *= 2;
@@ -452,7 +462,9 @@ static int initGL() {
 	free(draw_source);
 	free(final_source);
 
-	if (create_palette(&palette) != 0) return 2;
+	srand(time(0));
+
+	if (create_palette() != 0) return 2;
 	if (!create_textures()) return 2;
 
 	glActiveTexture(GL_TEXTURE0);
@@ -506,11 +518,6 @@ static void redraw_mandelbrot() {
 	current_tex = 0;
 	iteration = 0.f;
 
-	vec2 julia_pt = {0.0, 0.0};
-	if (julia) {
-		julia_pt = point_c_const;
-	}
-
 	glUseProgram(program_init.program_id);
 	set_uniform_vec2(program_init.program_id, "center", center);
 	set_uniform_f(program_init.program_id, "scale", scale);
@@ -518,8 +525,8 @@ static void redraw_mandelbrot() {
 
 	glUseProgram(program_step.program_id);
 
-	set_uniform_vec2(program_step.program_id, "point_c_const", julia_pt);
-
+	set_uniform_vec2(program_step.program_id, "point_c_const", point_c_const);
+	set_uniform_i(program_step.program_id, "draw_julia", julia);
 	set_uniform_vec2(program_step.program_id, "center", center);
 	set_uniform_f(program_step.program_id, "scale", scale);
 	set_uniform_f(program_step.program_id, "ratio", get_ratio());
@@ -528,6 +535,11 @@ static void redraw_mandelbrot() {
 	set_uniform_vec2(program_draw.program_id, "center", center);
 	set_uniform_f(program_draw.program_id, "scale", scale);
 	set_uniform_f(program_draw.program_id, "ratio", get_ratio());
+
+	glUseProgram(program_final.program_id);
+	set_uniform_vec2(program_final.program_id, "center", center);
+	set_uniform_f(program_final.program_id, "scale", scale);
+	set_uniform_f(program_final.program_id, "ratio", get_ratio());
 }
 
 static void render() {
@@ -598,6 +610,7 @@ static void render() {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glUseProgram(program_final.program_id);
 	set_uniform_i(program_final.program_id, "in_texture", 1);
+	set_uniform_vec2(program_final.program_id, "point_c_const", point_c_const);
 	glBindTexture(GL_TEXTURE_2D, tex_out.tex);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
@@ -674,7 +687,9 @@ int main(int argc, char**argv) {
 	redraw_mandelbrot();
 
 	while (!glfwWindowShouldClose(window)) {
-		render();
+		for (int i=0; i<NUM_ITERATIONS; ++i) {
+			render();
+		}
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

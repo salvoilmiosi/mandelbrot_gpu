@@ -27,4 +27,5 @@ void main() {
 	//DEBUG
 	//gl_FragColor = vec4(in_color.xyz, 1.0);
 	//gl_FragColor = vec4(point_c, 0.0, 1.0);
+	//gl_FragColor = texture2D(outside_palette, tex_coords);
 }
