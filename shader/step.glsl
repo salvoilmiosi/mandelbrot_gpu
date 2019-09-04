@@ -32,28 +32,11 @@ void main() {
 	float radius = length(point_c);
 	float theta = atan2(point_c.y, point_c.x);
 
-	// if (radius > 2.0) {
-	// 	gl_FragColor = in_color;
-	// } else {
-	// 	gl_FragColor.x = pow(radius, power) * cos(power * theta);
-	// 	gl_FragColor.y = pow(radius, power) * sin(power * theta);
-	// 	if (draw_julia) {
-	// 		gl_FragColor.xy += point_c_const;
-	// 	} else {
-	// 		gl_FragColor.xy += point_c;
-	// 	}
-	// 	gl_FragColor.z = iteration;
-	// 	gl_FragColor.w = 0.0;
-	// }
-
-	if (length(in_color.xy) > 2.0) {
+	if (radius > 2.0) {
 		gl_FragColor = in_color;
 	} else {
-		float a = in_color.x;
-		float b = in_color.y;
-		gl_FragColor.xy = vec2(a*a - b*b, 2.0*a*b);
-		//gl_FragColor.xy = vec2(a*a*a - 3.0*a*b*b, 3.0*a*a*b - b*b*b);
-		//gl_FragColor.xy = vec2(a*a*a*a - 6.0*a*a*b*b + b*b*b*b, 4.0*a*a*a*b - 4.0*a*b*b*b);
+		gl_FragColor.x = pow(radius, power) * cos(power * theta);
+		gl_FragColor.y = pow(radius, power) * sin(power * theta);
 		if (draw_julia) {
 			gl_FragColor.xy += point_c_const;
 		} else {
@@ -62,6 +45,23 @@ void main() {
 		gl_FragColor.z = iteration;
 		gl_FragColor.w = 0.0;
 	}
+
+	// if (length(in_color.xy) > 2.0) {
+	// 	gl_FragColor = in_color;
+	// } else {
+	// 	float a = in_color.x;
+	// 	float b = in_color.y;
+	// 	gl_FragColor.xy = vec2(a*a - b*b, 2.0*a*b);
+	// 	//gl_FragColor.xy = vec2(a*a*a - 3.0*a*b*b, 3.0*a*a*b - b*b*b);
+	// 	//gl_FragColor.xy = vec2(a*a*a*a - 6.0*a*a*b*b + b*b*b*b, 4.0*a*a*a*b - 4.0*a*b*b*b);
+	// 	if (draw_julia) {
+	// 		gl_FragColor.xy += point_c_const;
+	// 	} else {
+	// 		gl_FragColor.xy += point_c;
+	// 	}
+	// 	gl_FragColor.z = iteration;
+	// 	gl_FragColor.w = 0.0;
+	// }
 
 	//DEBUG
 	//gl_FragColor = in_color;
