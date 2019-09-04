@@ -1,3 +1,5 @@
+# include "bitmap.h"
+
 #include <cstdio>
 
 int save_bmp(const char *filename, const void *data, int width, int height) {
