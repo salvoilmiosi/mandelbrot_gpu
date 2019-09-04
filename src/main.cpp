@@ -31,6 +31,7 @@ struct vec2 {
 
 vec2 center;
 float scale;
+float alg_power = 2.0;
 bool julia = false;
 bool vsync = false;
 bool save_tex = false;
@@ -38,7 +39,7 @@ bool save_tex = false;
 vec2 point_c_const = {0.0, 0.0};
 
 float log_multiplier = 0.3;
-float log_shift = 6.0;
+float log_shift = 9.0;
 
 static void reset_mandelbrot();
 static void redraw_mandelbrot();
@@ -92,7 +93,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 		case GLFW_KEY_B:
 			printf("log_multipler = %f\nlog_shift = %f\n", log_multiplier, log_shift);
 			break;
-		case GLFW_KEY_L:
+		case GLFW_KEY_N:
 			create_palette();
 			break;
 		case GLFW_KEY_F12:
@@ -133,26 +134,33 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			center.x += 0.1 * scale;
 			redraw_mandelbrot();
 			break;
-		}
-		if (julia) {
-			switch(key) {
-			case GLFW_KEY_UP:
-				move_point_c_polar(0.0, 1.0);
-				redraw_mandelbrot();
-				break;
-			case GLFW_KEY_LEFT:
-				move_point_c_polar(-1.0, 0.00);
-				redraw_mandelbrot();
-				break;
-			case GLFW_KEY_DOWN:
-				move_point_c_polar(0.0, -1.0);
-				redraw_mandelbrot();
-				break;
-			case GLFW_KEY_RIGHT:
-				move_point_c_polar(1.0, 0.0);
-				redraw_mandelbrot();
-				break;
+		case GLFW_KEY_K:
+			alg_power -= 1.0;
+			if (alg_power < 1.0) {
+				alg_power = 1.0;
 			}
+			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_L:
+			alg_power += 1.0;
+			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_UP:
+			move_point_c_polar(0.0, 1.0);
+			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_LEFT:
+			move_point_c_polar(-1.0, 0.00);
+			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_DOWN:
+			move_point_c_polar(0.0, -1.0);
+			redraw_mandelbrot();
+			break;
+		case GLFW_KEY_RIGHT:
+			move_point_c_polar(1.0, 0.0);
+			redraw_mandelbrot();
+			break;
 		}
 	}
 }
@@ -214,7 +222,7 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 	}
 }
 
-static double get_ratio() {
+static inline double get_ratio() {
 	return (double) window_width / window_height;
 }
 
@@ -526,10 +534,11 @@ static void redraw_mandelbrot() {
 	glUseProgram(program_step.program_id);
 
 	set_uniform_vec2(program_step.program_id, "point_c_const", point_c_const);
-	set_uniform_i(program_step.program_id, "draw_julia", julia);
 	set_uniform_vec2(program_step.program_id, "center", center);
 	set_uniform_f(program_step.program_id, "scale", scale);
 	set_uniform_f(program_step.program_id, "ratio", get_ratio());
+	set_uniform_f(program_step.program_id, "power", alg_power);
+	set_uniform_i(program_step.program_id, "draw_julia", julia);
 
 	glUseProgram(program_draw.program_id);
 	set_uniform_vec2(program_draw.program_id, "center", center);
