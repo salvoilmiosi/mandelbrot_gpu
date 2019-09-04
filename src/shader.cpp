@@ -1,6 +1,4 @@
-#define _RESOURCE_EXTERN
 #include "shader.h"
-#undef _RESOURCE_EXTERN
 
 #include <cstdio>
 

@@ -30,26 +30,18 @@ public:
 
 #define BINARY_START(name) _binary_##name##_start
 #define BINARY_END(name) _binary_##name##_end
-#define RESOURCE_DATA(name) _resdata_##name##_get
+#define BINARY_RESDATA(name) _binary_##name##_resdata
 
-#ifdef _RESOURCE_EXTERN
-#define RESOURCE_DECLARE(name) resource_data RESOURCE_DATA(name)(&BINARY_START(name), &BINARY_END(name) - &BINARY_START(name));
-#else
-#define RESOURCE_DECLARE(name) extern resource_data RESOURCE_DATA(name);
-#endif
+#define BINARY_DECLARE(name)                \
+extern const char BINARY_START(name)[];     \
+extern const char BINARY_END(name)[];       \
+resource_data BINARY_RESDATA(name)(BINARY_START(name), BINARY_END(name) - BINARY_START(name));
 
-#define BINARY_DECLARE(name) extern const char BINARY_START(name); extern const char BINARY_END(name); RESOURCE_DECLARE(name);
-#define GET_RESOURCE(name) RESOURCE_DATA(name)()
+#define GET_RESOURCE(name) BINARY_RESDATA(name)()
 
 #define SHADER(name) shader_##name##_glsl
 #define SHADER_DECLARE(name) BINARY_DECLARE(SHADER(name))
 #define GET_SHADER(name) GET_RESOURCE(SHADER(name))
-
-SHADER_DECLARE(vertex)
-SHADER_DECLARE(init)
-SHADER_DECLARE(step)
-SHADER_DECLARE(draw)
-SHADER_DECLARE(final)
 
 struct vec2 {
 	float x;

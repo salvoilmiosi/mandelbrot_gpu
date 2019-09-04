@@ -39,6 +39,12 @@ float log_shift = 9.0;
 GLuint vao;
 GLuint vbo;
 
+SHADER_DECLARE(vertex);
+SHADER_DECLARE(init);
+SHADER_DECLARE(step);
+SHADER_DECLARE(draw);
+SHADER_DECLARE(final);
+
 shader_program program_init("init");
 shader_program program_step("step");
 shader_program program_draw("draw");
