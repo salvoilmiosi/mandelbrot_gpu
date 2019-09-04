@@ -551,6 +551,29 @@ static void redraw_mandelbrot() {
 	set_uniform_f(program_final.program_id, "ratio", get_ratio());
 }
 
+static int save_screenshot(const char *filename) {
+	size_t bufsize = tex_width * tex_height * 3;
+	GLubyte *data = (GLubyte*) malloc(bufsize);
+
+	if (!data) {
+		fprintf(stderr, "Not enough memory to save a screenshot");
+		return 1;
+	}
+
+	glBindTexture(GL_TEXTURE_2D, tex_out.tex);
+	glGetnTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, bufsize, data);
+
+	if (check_gl_error("Could not read texture") == 0) {
+		if (save_bmp(filename, data, tex_width, tex_height) == 0) {
+			return 0;
+		}
+		return 2;
+	}
+	return 3;
+
+	free(data);
+}
+
 static void render() {
 	glViewport(0, 0, tex_width, tex_height);
 
@@ -596,22 +619,12 @@ static void render() {
 
 	if (save_tex) {
 		save_tex = false;
+
+		const char *filename = "screenshot.data";
 		
-		size_t bufsize = tex_width * tex_height * 3;
-		GLubyte *data = (GLubyte*) malloc(bufsize);
-
-		glBindTexture(GL_TEXTURE_2D, tex_out.tex);
-		glGetnTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, bufsize, data);
-
-		if (check_gl_error("Could not read texture") == 0) {
-			const char *filename = "screenshot.data";
-
-			if (save_bmp(filename, data, tex_width, tex_height) == 0) {
-				printf("Saved screenshot to %s (%d x %d)\n", filename, tex_width, tex_height);
-			}
+		if (save_screenshot(filename) == 0) {
+			printf("Saved screenshot to %s (%d x %d)\n", filename, tex_width, tex_height);
 		}
-
-		free(data);
 	}
 
 	glViewport(0, 0, window_width, window_height);
