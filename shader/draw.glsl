@@ -7,7 +7,7 @@ uniform sampler2D outside_palette;
 
 const vec4 color_inside = vec4(0.0, 0.0, 0.0, 1.0);
 
-varying vec2 point_c;
+varying vec2 start_z;
 varying vec2 tex_coords;
 
 uniform float log_multiplier;
@@ -26,6 +26,6 @@ void main() {
 
 	//DEBUG
 	//gl_FragColor = vec4(in_color.xyz, 1.0);
-	//gl_FragColor = vec4(point_c, 0.0, 1.0);
+	//gl_FragColor = vec4(start_z, 0.0, 1.0);
 	//gl_FragColor = texture2D(outside_palette, tex_coords);
 }

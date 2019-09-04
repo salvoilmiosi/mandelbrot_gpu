@@ -32,11 +32,11 @@ struct vec2 {
 vec2 center;
 float scale;
 float alg_power = 2.0;
-bool julia = false;
+bool draw_julia = false;
 bool vsync = false;
 bool save_tex = false;
 
-vec2 point_c_const = {0.0, 0.0};
+vec2 julia_c = {0.0, 0.0};
 
 float log_multiplier = 0.3;
 float log_shift = 9.0;
@@ -49,13 +49,13 @@ static void error_callback(int error, const char *description) {
 	fprintf(stderr, "GLFW error %d: %s\n", error, description);
 }
 
-static void move_point_c_polar(float x_mul, float y_mul) {
-	double theta = atan2(point_c_const.y, point_c_const.x);
-	double modulo = sqrt(point_c_const.x * point_c_const.x + point_c_const.y * point_c_const.y);
+static void move_c_polar(float x_mul, float y_mul) {
+	double theta = atan2(julia_c.y, julia_c.x);
+	double modulo = sqrt(julia_c.x * julia_c.x + julia_c.y * julia_c.y);
 	theta -= x_mul * 0.01;
 	modulo *= 1.0 + y_mul * 0.01;
-	point_c_const.x = (float)(cos(theta) * modulo);
-	point_c_const.y = (float)(sin(theta) * modulo);
+	julia_c.x = (float)(cos(theta) * modulo);
+	julia_c.y = (float)(sin(theta) * modulo);
 }
 
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
@@ -68,7 +68,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_J:
-			julia = !julia;
+			draw_julia = !draw_julia;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_R:
@@ -88,7 +88,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_P:
-			printf("center = (%f, %f)\nscale = %f\npoint_c_const = (%f, %f)\n", center.x, center.y, scale, point_c_const.x, point_c_const.y);
+			printf("center = (%f, %f)\nscale = %f\njulia_c = (%f, %f)\n", center.x, center.y, scale, julia_c.x, julia_c.y);
 			break;
 		case GLFW_KEY_B:
 			printf("log_multipler = %f\nlog_shift = %f\n", log_multiplier, log_shift);
@@ -146,19 +146,19 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_UP:
-			move_point_c_polar(0.0, 1.0);
+			move_c_polar(0.0, 1.0);
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_LEFT:
-			move_point_c_polar(-1.0, 0.00);
+			move_c_polar(-1.0, 0.00);
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_DOWN:
-			move_point_c_polar(0.0, -1.0);
+			move_c_polar(0.0, -1.0);
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_RIGHT:
-			move_point_c_polar(1.0, 0.0);
+			move_c_polar(1.0, 0.0);
 			redraw_mandelbrot();
 			break;
 		}
@@ -213,8 +213,8 @@ static void mouse_button_callback(GLFWwindow *window, int button, int action, in
 	case GLFW_MOUSE_BUTTON_RIGHT:
 		switch (action) {
 		case GLFW_PRESS:
-			point_c_const = mouse_pt_to_scale(mouse_x, mouse_y);
-			julia = true;
+			julia_c = mouse_pt_to_scale(mouse_x, mouse_y);
+			draw_julia = true;
 			redraw_mandelbrot();
 			break;
 		}
@@ -533,12 +533,12 @@ static void redraw_mandelbrot() {
 
 	glUseProgram(program_step.program_id);
 
-	set_uniform_vec2(program_step.program_id, "point_c_const", point_c_const);
+	set_uniform_vec2(program_step.program_id, "julia_c", julia_c);
 	set_uniform_vec2(program_step.program_id, "center", center);
 	set_uniform_f(program_step.program_id, "scale", scale);
 	set_uniform_f(program_step.program_id, "ratio", get_ratio());
 	set_uniform_f(program_step.program_id, "power", alg_power);
-	set_uniform_i(program_step.program_id, "draw_julia", julia);
+	set_uniform_i(program_step.program_id, "draw_julia", draw_julia);
 
 	glUseProgram(program_draw.program_id);
 	set_uniform_vec2(program_draw.program_id, "center", center);
@@ -619,7 +619,7 @@ static void render() {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glUseProgram(program_final.program_id);
 	set_uniform_i(program_final.program_id, "in_texture", 1);
-	set_uniform_vec2(program_final.program_id, "point_c_const", point_c_const);
+	set_uniform_vec2(program_final.program_id, "julia_c", julia_c);
 	glBindTexture(GL_TEXTURE_2D, tex_out.tex);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }

@@ -6,10 +6,10 @@ uniform sampler2D in_texture;
 
 uniform float iteration;
 
-varying vec2 point_c;
+varying vec2 start_z;
 varying vec2 tex_coords;
 
-uniform vec2 point_c_const;
+uniform vec2 julia_c;
 uniform bool draw_julia;
 
 uniform float power;
@@ -34,16 +34,25 @@ void main() {
 	if (dot(z, z) > 4.0) {
 		gl_FragColor = in_color;
 	} else {
-		float radius = length(z);
-		float theta = atan2(z.y, z.x);
+		float a = z.x;
+		float b = z.y;
 
-		gl_FragColor.x = pow(radius, power) * cos(power * theta);
-		gl_FragColor.y = pow(radius, power) * sin(power * theta);
-		if (draw_julia) {
-			gl_FragColor.xy += point_c_const;
+		if (power == 1.0) {
+			gl_FragColor.xy = z;
+		} else if (power == 2.0) {
+			gl_FragColor.x = a*a - b*b;
+			gl_FragColor.y = 2.0 * a * b;
 		} else {
-			gl_FragColor.xy += point_c;
+			float radius = length(z);
+			float theta = atan2(b, a);
+
+			radius = pow(radius, power);
+
+			gl_FragColor.x = radius * cos(power * theta);
+			gl_FragColor.y = radius * sin(power * theta);
 		}
+
+		gl_FragColor.xy += draw_julia ? julia_c : start_z;
 		gl_FragColor.z = iteration;
 		gl_FragColor.w = 0.0;
 	}
@@ -57,9 +66,9 @@ void main() {
 	// 	//gl_FragColor.xy = vec2(a*a*a - 3.0*a*b*b, 3.0*a*a*b - b*b*b);
 	// 	//gl_FragColor.xy = vec2(a*a*a*a - 6.0*a*a*b*b + b*b*b*b, 4.0*a*a*a*b - 4.0*a*b*b*b);
 	// 	if (draw_julia) {
-	// 		gl_FragColor.xy += point_c_const;
+	// 		gl_FragColor.xy += julia_c;
 	// 	} else {
-	// 		gl_FragColor.xy += point_c;
+	// 		gl_FragColor.xy += start_z;
 	// 	}
 	// 	gl_FragColor.z = iteration;
 	// 	gl_FragColor.w = 0.0;
