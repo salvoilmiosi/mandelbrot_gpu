@@ -22,7 +22,7 @@ static int tex_height;
 int current_tex = 0;
 float iteration = 0.f;
 
-const int NUM_ITERATIONS = 10;
+const int NUM_ITERATIONS = 1;
 
 struct vec2 {
 	float x;
