@@ -9,7 +9,7 @@ int shader::compile() {
 		shader_id = glCreateShader(type);
 	}
 
-	glShaderSource(shader_id, 1, &source.data, &source.length);
+	glShaderSource(shader_id, 1, &source.data, &source.size);
 	glCompileShader(shader_id);
 
 	int length = 0;

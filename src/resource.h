@@ -6,7 +6,7 @@
 struct resource {
     const char *name;
     const char *data;
-    const int length;
+    const int size;
 };
 
 #define BINARY_START(name) _binary_##name##_start
@@ -14,11 +14,11 @@ struct resource {
 #define BINARY_SIZE(name) (BINARY_END(name) - BINARY_START(name))
 #define BINARY_RESOURCE(name) _binary_##name##_resource
 
-#define BINARY_DECLARE(name) \
+#define DECLARE_BINARY(name) \
 extern char BINARY_START(name)[]; extern char BINARY_END(name)[]; \
 resource BINARY_RESOURCE(name) = {#name, BINARY_START(name), (int)BINARY_SIZE(name)};
 
-#define EXTERN_BINARY_DECLARE(name) extern resource BINARY_RESOURCE(name);
+#define DECLARE_BINARY_EXTERN(name) extern resource BINARY_RESOURCE(name);
 #define GET_RESOURCE(name) BINARY_RESOURCE(name)
 
 #endif

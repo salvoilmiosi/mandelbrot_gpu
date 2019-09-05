@@ -18,7 +18,8 @@ int window_height = 600;
 
 int current_tex = 0;
 float iteration = 0.f;
-int num_iterations = 1;
+
+enum { NumIterations = 1 };
 
 vec2 center = {0.0, 0.0};
 vec2 julia_c = {-0.4, 0.6};
@@ -31,11 +32,11 @@ bool save_tex = false;
 float log_multiplier = 0.3;
 float log_shift = 9.0;
 
-SHADER_DECLARE(GL_VERTEX_SHADER, vertex);
-SHADER_DECLARE(GL_FRAGMENT_SHADER, init);
-SHADER_DECLARE(GL_FRAGMENT_SHADER, step);
-SHADER_DECLARE(GL_FRAGMENT_SHADER, draw);
-SHADER_DECLARE(GL_FRAGMENT_SHADER, final);
+DECLARE_SHADER(GL_VERTEX_SHADER, vertex);
+DECLARE_SHADER(GL_FRAGMENT_SHADER, init);
+DECLARE_SHADER(GL_FRAGMENT_SHADER, step);
+DECLARE_SHADER(GL_FRAGMENT_SHADER, draw);
+DECLARE_SHADER(GL_FRAGMENT_SHADER, final);
 
 shader_program program_init(SHADER(vertex), SHADER(init));
 shader_program program_step(SHADER(vertex), SHADER(step));
@@ -523,7 +524,7 @@ int main(int argc, char**argv) {
 	redraw_mandelbrot();
 
 	while (!glfwWindowShouldClose(window)) {
-		for (int i=0; i<num_iterations; ++i) {
+		for (int i=0; i<NumIterations; ++i) {
 			render();
 		}
 

@@ -8,8 +8,9 @@
 #define SHADER_SOURCE(name) shader_##name##_glsl
 #define GET_SHADER_SOURCE(name) GET_RESOURCE(SHADER_SOURCE(name))
 #define SHADER(name) _shader_##name
-#define SHADER_DECLARE(type, name)      \
-BINARY_DECLARE(SHADER_SOURCE(name))     \
+
+#define DECLARE_SHADER(type, name)      \
+DECLARE_BINARY(SHADER_SOURCE(name))     \
 shader SHADER(name)(#name, type, GET_SHADER_SOURCE(name));
 
 struct vec2 {
