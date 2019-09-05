@@ -1,11 +1,11 @@
-#version 100
+#version 330
 
 precision highp float;
 
-attribute vec2 position;
+layout(location=0) in vec2 position;
 
-varying vec2 start_z;
-varying vec2 tex_coords;
+out vec2 start_z;
+out vec2 tex_coords;
 
 uniform vec2 center;
 uniform float scale;

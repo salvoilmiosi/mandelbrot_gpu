@@ -1,18 +1,17 @@
-#version 100
+#version 330
 
 precision highp float;
 
+layout(location=0) out vec4 fragColor;
+
+in vec2 start_z;
+in vec2 tex_coords;
+
 uniform sampler2D in_texture;
-
 uniform float iteration;
-
-varying vec2 start_z;
-varying vec2 tex_coords;
-
 uniform vec2 julia_c;
 uniform bool draw_julia;
-
-uniform float power;
+uniform float z_power;
 
 #define PI 3.1415926538
 
@@ -27,34 +26,37 @@ float atan2(float y, float x) {
 }
 
 void main() {
-	vec4 in_color = texture2D(in_texture, tex_coords);
+	vec4 in_color = texture(in_texture, tex_coords);
 
 	vec2 z = in_color.xy;
 
 	if (dot(z, z) > 4.0) {
-		gl_FragColor = in_color;
+		fragColor = in_color;
 	} else {
 		float a = z.x;
 		float b = z.y;
 
-		if (power == 1.0) {
-			gl_FragColor.xy = z;
-		} else if (power == 2.0) {
-			gl_FragColor.x = a*a - b*b;
-			gl_FragColor.y = 2.0 * a * b;
+		if (z_power == 1.0) {
+			fragColor.xy = z;
+		} else if (z_power == 2.0) {
+			fragColor.x = a*a - b*b;
+			fragColor.y = 2.0 * a * b;
+		} else if (z_power == 3.0) {
+			fragColor.x = a*a*a - 3.0 * a*b*b;
+			fragColor.y = 3.0 * a*a*b - b*b*b;
 		} else {
 			float radius = length(z);
 			float theta = atan2(b, a);
 
-			radius = pow(radius, power);
+			radius = pow(radius, z_power);
 
-			gl_FragColor.x = radius * cos(power * theta);
-			gl_FragColor.y = radius * sin(power * theta);
+			fragColor.x = radius * cos(z_power * theta);
+			fragColor.y = radius * sin(z_power * theta);
 		}
 
-		gl_FragColor.xy += draw_julia ? julia_c : start_z;
-		gl_FragColor.z = iteration;
-		gl_FragColor.w = 0.0;
+		fragColor.xy += draw_julia ? julia_c : start_z;
+		fragColor.z = iteration;
+		fragColor.w = 0.0;
 	}
 
 	//DEBUG

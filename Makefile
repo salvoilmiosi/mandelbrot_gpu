@@ -1,8 +1,8 @@
 CXX = g++
 LD = g++
 MAKE = make
-CFLAGS = -Wall --std=c++11
-LDFLAGS = -s -O2
+CFLAGS = -g -Wall --std=c++11
+LDFLAGS = 
 LIBS = `pkg-config --static --libs x11 xrandr xi xxf86vm glew glfw3`
 
 INCLUDE = 
@@ -24,7 +24,7 @@ SOURCES = $(wildcard src/*.cpp)
 OBJECTS = $(patsubst src/%,$(OBJ_DIR)/%.o,$(basename $(SOURCES)))
 
 SHADERS = $(wildcard $(SHADER_DIR)/*.glsl)
-SHADER_OBJ = $(patsubst $(SHADER_DIR)/%,$(OBJ_DIR)/%.o,$(basename $(SHADERS)))
+SHADERS_LD = -Wl,--format=binary $(SHADERS) -Wl,--format=default
 
 all: $(BIN_DIR)/$(OUT_BIN)
 
@@ -32,19 +32,15 @@ clean:
 	rm -rf $(BIN_DIR)
 	rm -rf $(OBJ_DIR)
 
-$(BIN_DIR)/$(OUT_BIN): $(OBJECTS) $(SHADER_OBJ)
+$(BIN_DIR)/$(OUT_BIN): $(OBJECTS) $(SHADERS)
 	@mkdir -p $(BIN_DIR)
-	$(LD) -o $(BIN_DIR)/$(OUT_BIN) $(OBJECTS) $(SHADER_OBJ) $(LDFLAGS) $(LIBS)
+	$(LD) -o $(BIN_DIR)/$(OUT_BIN) $(OBJECTS) $(SHADERS_LD) $(LDFLAGS) $(LIBS)
 
 $(OBJ_DIR)/%.o : src/%.cpp
 $(OBJ_DIR)/%.o : src/%.cpp $(OBJ_DIR)/%.d
 	@mkdir -p $(OBJ_DIR)
 	$(CXX) $(DEPFLAGS) $(CFLAGS) -c $(addprefix -I,$(INCLUDE)) -o $@ $<
 	@mv -f $(OBJ_DIR)/$*.Td $(OBJ_DIR)/$*.d
-
-$(OBJ_DIR)/%.o : shader/%.glsl
-	@mkdir -p $(OBJ_DIR)
-	objcopy -I binary -O elf64-x86-64 -B i386 $< $@
 
 $(OBJ_DIR)/%.d: ;
 .PRECIOUS: $(OBJ_DIR)/%.d

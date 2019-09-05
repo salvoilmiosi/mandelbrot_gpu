@@ -5,31 +5,58 @@
 
 #include "resource.h"
 
-#define SHADER(name) shader_##name##_glsl
-#define SHADER_DECLARE(name) BINARY_DECLARE(SHADER(name))
-#define GET_SHADER(name) GET_RESOURCE(SHADER(name))
+#define SHADER_SOURCE(name) shader_##name##_glsl
+#define GET_SHADER_SOURCE(name) GET_RESOURCE(SHADER_SOURCE(name))
+#define SHADER(name) _shader_##name
+#define SHADER_DECLARE(type, name)      \
+BINARY_DECLARE(SHADER_SOURCE(name))     \
+shader SHADER(name)(#name, type, GET_SHADER_SOURCE(name));
 
 struct vec2 {
 	float x;
 	float y;
 };
 
+class shader {
+private:
+    GLuint shader_id = 0;
+    
+    const char *name;
+    const GLenum type;
+    const resource &source;
+
+public:
+    shader(const char *name, const GLenum type, const resource &source) : name(name), type(type), source(source) {};
+
+    ~shader() {
+        glDeleteShader(shader_id);
+    }
+
+    int compile();
+
+private:
+    friend class shader_program;
+};
+
 class shader_program {
 private:
 	GLuint program_id = 0;
-	GLuint vertex_shader = 0;
-	GLuint fragment_shader = 0;
+
+	shader &vertex;
+	shader &fragment;
 
 public:
+    shader_program(shader &vertex, shader &fragment) : vertex(vertex), fragment(fragment) {}
+
     ~shader_program() {
-        glDetachShader(program_id, vertex_shader);
-        glDeleteShader(vertex_shader);
-        glDetachShader(program_id, fragment_shader);
-        glDeleteShader(fragment_shader);
-        glDeleteProgram(program_id);
+        if (program_id) {
+            glDetachShader(program_id, vertex.shader_id);
+            glDetachShader(program_id, fragment.shader_id);
+            glDeleteProgram(program_id);
+        }
     }
 
-    int create_program(const resource &vertex_source, const resource &fragment_source);
+    int compile();
 
     void use_program() {
         glUseProgram(program_id);
