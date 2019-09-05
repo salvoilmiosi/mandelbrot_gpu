@@ -43,3 +43,21 @@ int shader_program::compile() {
 
 	return 0;
 }
+
+void shader_program::update_uniforms() {
+	for (std::pair<const int, uniform *> &i : uniforms) {
+		int location = i.first;
+		uniform *uni = i.second;
+		switch(uni->type) {
+		case TYPE_INT:
+			glUniform1i(location, uni->value_int);
+			break;
+		case TYPE_FLOAT:
+			glUniform1f(location, uni->value_float);
+			break;
+		case TYPE_VEC2:
+			glUniform2f(location, uni->value_vec2.x, uni->value_vec2.y);
+			break;
+		}
+	}
+}

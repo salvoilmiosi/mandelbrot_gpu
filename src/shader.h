@@ -2,6 +2,7 @@
 #define __SHADER_H__
 
 #include <GL/glew.h>
+#include <map>
 
 #include "resource.h"
 
@@ -13,9 +14,13 @@
 DECLARE_BINARY(SHADER_SOURCE(name))     \
 shader SHADER(name)(#name, type, GET_SHADER_SOURCE(name));
 
+#define DECLARE_UNIFORM(name, value) uniform name(#name, value);
+
 struct vec2 {
 	float x;
 	float y;
+
+    vec2(float x, float y) : x(x), y(y) {}
 };
 
 class shader {
@@ -39,12 +44,72 @@ private:
     friend class shader_program;
 };
 
+enum uniform_type {
+    TYPE_INT,
+    TYPE_FLOAT,
+    TYPE_VEC2
+};
+
+struct uniform {
+    const char *name;
+    uniform_type type;
+
+    union {
+        int value_int;
+        float value_float;
+        vec2 value_vec2;
+    };
+
+    template<typename T>
+    uniform(const char *name, T value) : name(name) {
+        *this = value;
+    }
+
+    int &operator = (const int &value) {
+        type = TYPE_INT;
+        return value_int = value;
+    }
+
+    float &operator = (const float &value) {
+        type = TYPE_FLOAT;
+        return value_float = value;
+    }
+
+    float &operator = (const double &value) {
+        type = TYPE_FLOAT;
+        return value_float = value;
+    }
+
+    vec2 &operator = (const vec2 &value) {
+        type = TYPE_VEC2;
+        return value_vec2 = value;
+    }
+
+    operator int() {
+        return value_int;
+    }
+
+    operator bool() {
+        return value_int;
+    }
+
+    operator float() {
+        return value_float;
+    }
+
+    operator vec2() {
+        return value_vec2;
+    }
+};
+
 class shader_program {
 private:
 	GLuint program_id = 0;
 
 	shader &vertex;
 	shader &fragment;
+
+    std::map<int, uniform *> uniforms;
 
 public:
     shader_program(shader &vertex, shader &fragment) : vertex(vertex), fragment(fragment) {}
@@ -59,24 +124,25 @@ public:
 
     int compile();
 
+    void add_uniform(uniform &uni) {
+        int location = glGetUniformLocation(program_id, uni.name);
+        uniforms[location] = &uni;
+    }
+
+    void add_uniforms() {}
+
+    template <typename ... Ts>
+    void add_uniforms(uniform &first, Ts &...unis) {
+        add_uniform(first);
+        add_uniforms(unis...);
+    }
+
     void use_program() {
-        glUseProgram(program_id);
+	    glUseProgram(program_id);
+        update_uniforms();
     }
 
-    void set_uniform_i(const char *name, int value) {
-        int location = glGetUniformLocation(program_id, name);
-        glUniform1i(location, value);
-    }
-
-    void set_uniform_f(const char *name, float value) {
-        int location = glGetUniformLocation(program_id, name);
-        glUniform1f(location, value);
-    }
-
-    void set_uniform_vec2(const char *name, vec2 value) {
-        int location = glGetUniformLocation(program_id, name);
-        glUniform2f(location, value.x, value.y);
-    }
+    void update_uniforms();
 };
 
 #endif

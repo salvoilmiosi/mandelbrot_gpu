@@ -17,20 +17,30 @@ int window_width = 800;
 int window_height = 600;
 
 int current_tex = 0;
-float iteration = 0.f;
 
-enum { NumIterations = 1 };
-
-vec2 center = {0.0, 0.0};
-vec2 julia_c = {-0.4, 0.6};
-float scale = 1.5;
-float z_power = 2.0;
-bool draw_julia = false;
 bool vsync = false;
 bool save_tex = false;
 
-float log_multiplier = 0.3;
-float log_shift = 9.0;
+enum { NumIterations = 1 };
+
+GLuint palette = 0; // palette texture
+
+texture_io tex1, tex2, tex_out;
+
+GLuint vao = 0;
+GLuint vbo = 0;
+
+DECLARE_UNIFORM(in_texture, 1);				// sampler for input texture in shaders
+DECLARE_UNIFORM(outside_palette, 0);		// sampler for palette texture
+DECLARE_UNIFORM(iteration, 0.0);			// number of iteration in algorithm
+DECLARE_UNIFORM(center, vec2(0.0, 0.0));	// center of rendering
+DECLARE_UNIFORM(scale, 1.5); 				// scale of rendering
+DECLARE_UNIFORM(ratio, 1.0);				// window width / window height
+DECLARE_UNIFORM(julia_c, vec2(-0.4, 0.6));	// C constant in Julia fractal
+DECLARE_UNIFORM(z_power, 2.0);				// Power of Z in algorithm
+DECLARE_UNIFORM(draw_julia, false);			// true:render Mandelbrot set - false:render Julia set
+DECLARE_UNIFORM(log_multiplier, 0.3);		// Shifts the "inner" colors in the draw shader
+DECLARE_UNIFORM(log_shift, 9.0);			// Shifts the "outer" colors in the draw shader
 
 DECLARE_SHADER(GL_VERTEX_SHADER, vertex);
 DECLARE_SHADER(GL_FRAGMENT_SHADER, init);
@@ -42,13 +52,6 @@ shader_program program_init(SHADER(vertex), SHADER(init));
 shader_program program_step(SHADER(vertex), SHADER(step));
 shader_program program_draw(SHADER(vertex), SHADER(draw));
 shader_program program_final(SHADER(vertex), SHADER(final));
-
-GLuint palette = 0; // palette texture
-
-texture_io tex1, tex2, tex_out;
-
-GLuint vao = 0;
-GLuint vbo = 0;
 
 void error_callback(int error, const char *description) {
 	fprintf(stderr, "GLFW error %d: %s\n", error, description);
@@ -144,6 +147,11 @@ int init_gl() {
 	if (program_draw.compile() != 0) return 1;
 	if (program_final.compile() != 0) return 1;
 
+	program_init.add_uniforms(center, scale, ratio);
+	program_step.add_uniforms(center, scale, ratio, in_texture, iteration, julia_c, draw_julia, z_power);
+	program_draw.add_uniforms(center, scale, ratio, in_texture, outside_palette, log_multiplier, log_shift);
+	program_final.add_uniforms(center, scale, ratio, in_texture, julia_c);
+
 	srand(time(0));
 
 	if (create_palette() != 0) return 2;
@@ -178,7 +186,7 @@ void cleanup_gl() {
 }
 
 inline void reset_mandelbrot() {
-	center = {0.f, 0.f};
+	center = vec2(0.f, 0.f);
 	scale = 1.5f;
 }
 
@@ -217,50 +225,37 @@ void render() {
 	glBindTexture(GL_TEXTURE_2D, palette);
 
 	glActiveTexture(GL_TEXTURE1);
+	tex1.bind_texture();
+	glActiveTexture(GL_TEXTURE2);
+	tex2.bind_texture();
+	glActiveTexture(GL_TEXTURE3);
+	tex_out.bind_texture();
 
-	float ratio = (float) window_width / window_height;
+	ratio = (float) window_width / window_height;
 
 	if (current_tex == 0) {
 		tex1.bind_framebuffer();
 		program_init.use_program();
-		program_init.set_uniform_vec2("center", center);
-		program_init.set_uniform_f("scale", scale);
-		program_init.set_uniform_f("ratio", ratio);
 
-		glBindTexture(GL_TEXTURE_2D, 0);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 		current_tex = 1;
 	}
 
 	(current_tex == 1 ? tex2 : tex1).bind_framebuffer();
-	(current_tex == 1 ? tex1 : tex2).bind_texture();
+
+	in_texture = current_tex;
 
 	program_step.use_program();
-	program_step.set_uniform_vec2("julia_c", julia_c);
-	program_step.set_uniform_vec2("center", center);
-	program_step.set_uniform_f("iteration", iteration);
-	program_step.set_uniform_f("scale", scale);
-	program_step.set_uniform_f("ratio", ratio);
-	program_step.set_uniform_f("z_power", z_power);
-	program_step.set_uniform_i("draw_julia", draw_julia);
-	program_step.set_uniform_i("in_texture", 1);
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 	current_tex = current_tex == 1 ? 2 : 1;
-	iteration += 1.f;
+	iteration.value_float += 1.f;
 
 	tex_out.bind_framebuffer();
 
 	program_draw.use_program();
-	program_draw.set_uniform_vec2("center", center);
-	program_draw.set_uniform_f("log_multiplier", log_multiplier);
-	program_draw.set_uniform_f("log_shift", log_shift);
-	program_draw.set_uniform_f("scale", scale);
-	program_draw.set_uniform_f("ratio", ratio);
-	program_draw.set_uniform_i("in_texture", 1);
-	program_draw.set_uniform_i("outside_palette", 0);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 	if (save_tex) {
@@ -276,23 +271,17 @@ void render() {
 	glViewport(0, 0, window_width, window_height);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	tex_out.bind_texture();
+	in_texture = 3;
 	program_final.use_program();
-	program_final.set_uniform_vec2("julia_c", julia_c);
-	program_final.set_uniform_vec2("center", center);
-	program_final.set_uniform_f("scale", scale);
-	program_final.set_uniform_f("ratio", ratio);
-	program_final.set_uniform_i("in_texture", 1);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
 void move_c_polar(float x_mul, float y_mul) {
-	float theta = atan2(julia_c.y, julia_c.x);
-	float radius = sqrt(julia_c.x * julia_c.x + julia_c.y * julia_c.y);
+	float theta = atan2(julia_c.value_vec2.y, julia_c.value_vec2.x);
+	float radius = sqrt(julia_c.value_vec2.x * julia_c.value_vec2.x + julia_c.value_vec2.y * julia_c.value_vec2.y);
 	theta -= x_mul * 0.01;
 	radius *= 1.0 + y_mul * 0.01;
-	julia_c.x = (float)(cos(theta) * radius);
-	julia_c.y = (float)(sin(theta) * radius);
+	julia_c = vec2(cos(theta) * radius, sin(theta) * radius);
 }
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
@@ -305,7 +294,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_J:
-			draw_julia = !draw_julia;
+			draw_julia = !(bool)draw_julia;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_R:
@@ -317,18 +306,19 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 			glfwSwapInterval(vsync);
 			break;
 		case GLFW_KEY_PAGE_UP:
-			scale *= 0.5f;
+			scale.value_float *= 0.5f;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_PAGE_DOWN:
-			scale *= 2.f;
+			scale.value_float *= 2.f;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_P:
-			printf("center = (%f, %f)\nscale = %f\njulia_c = (%f, %f)\nz_power=%f\n", center.x, center.y, scale, julia_c.x, julia_c.y, z_power);
+			printf("center = (%f, %f)\nscale = %f\njulia_c = (%f, %f)\nz_power=%f\n",
+				center.value_vec2.x, center.value_vec2.y, (float)scale, julia_c.value_vec2.x, julia_c.value_vec2.y, (float)z_power);
 			break;
 		case GLFW_KEY_B:
-			printf("log_multipler = %f\nlog_shift = %f\n", log_multiplier, log_shift);
+			printf("log_multipler = %f\nlog_shift = %f\n", (float) log_multiplier, (float) log_shift);
 			break;
 		case GLFW_KEY_N:
 			create_palette();
@@ -341,45 +331,45 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
 		switch(key) {
 		case GLFW_KEY_Z:
-			log_multiplier /= 1.1;
+			log_multiplier.value_float /= 1.02f;
 			break;
 		case GLFW_KEY_X:
-			log_multiplier *= 1.1;
+			log_multiplier.value_float *= 1.02f;
 			break;
 		case GLFW_KEY_C:
-			log_shift -= 0.1;
-			if (log_shift < 1.0) {
-				log_shift = 1.0;
+			log_shift.value_float -= 0.1f;
+			if ((float)log_shift < 1.0) {
+				log_shift = 1.0f;
 			}
 			break;
 		case GLFW_KEY_V:
-			log_shift += 0.1;
+			log_shift.value_float += 0.1f;
 			break;
 		case GLFW_KEY_W:
-			center.y += 0.1 * scale;
+			center.value_vec2.y += 0.1 * (float)scale;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_A:
-			center.x -= 0.1 * scale;
+			center.value_vec2.x -= 0.1 * (float)scale;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_S:
-			center.y -= 0.1 * scale;
+			center.value_vec2.y -= 0.1 * (float)scale;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_D:
-			center.x += 0.1 * scale;
+			center.value_vec2.x += 0.1 * (float)scale;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_K:
-			z_power -= 1.0;
-			if (z_power < 1.0) {
-				z_power = 1.0;
+			z_power.value_float -= 1.0f;
+			if ((float)z_power < 1.0) {
+				z_power = 1.0f;
 			}
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_L:
-			z_power += 1.0;
+			z_power.value_float += 1.0f;
 			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_UP:
@@ -404,7 +394,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 
 vec2 mouse_pt_to_scale(float mouse_x, float mouse_y) {
 	vec2 pt = center;
-	float scale_len = 2 * scale / window_height;
+	float scale_len = 2 * (float)scale / window_height;
 
 	float dx_to_center = mouse_x - (window_width / 2);
 	float dy_to_center = mouse_y - (window_height / 2);
@@ -434,7 +424,7 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
 			center = mouse_pt_to_scale(press_x, press_y);
 
 			if (mouse_x != press_x || mouse_y != press_y) {
-				float scale_len = 2 * scale / window_height;
+				float scale_len = 2 * (float)scale / window_height;
 
 				float dx = mouse_x - press_x;
 				float dy = mouse_y - press_y;
