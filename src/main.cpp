@@ -195,7 +195,9 @@ inline void redraw_mandelbrot() {
 	iteration = 0.f;
 }
 
-int save_screenshot(const char *filename) {
+int save_screenshot() {
+	const char *filename = "screenshot.ppm";
+
 	size_t bufsize = tex_out.width * tex_out.height * 3;
 	GLubyte *data = (GLubyte*) malloc(bufsize);
 
@@ -208,7 +210,8 @@ int save_screenshot(const char *filename) {
 	glGetnTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, bufsize, data);
 
 	if (check_gl_error("Could not read texture") == 0) {
-		if (save_bmp(filename, data, tex_out.width, tex_out.height) == 0) {
+		if (save_ppm(filename, data, tex_out.width, tex_out.height) > 0) {
+			printf("Saved screenshot to %s\n", filename);
 			return 0;
 		}
 		return 2;
@@ -260,12 +263,7 @@ void render() {
 
 	if (save_tex) {
 		save_tex = false;
-
-		const char *filename = "screenshot.data";
-		
-		if (save_screenshot(filename) == 0) {
-			printf("Saved screenshot to %s (%d x %d)\n", filename, tex_out.width, tex_out.height);
-		}
+		save_screenshot();
 	}
 
 	glViewport(0, 0, window_width, window_height);

@@ -3,7 +3,7 @@
 *.d
 *.png
 *.jpg
-*.data
+*.ppm
 .vscode/
 bin/
 obj/
