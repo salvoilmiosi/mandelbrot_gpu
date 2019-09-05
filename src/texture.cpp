@@ -1,7 +1,10 @@
 #include "texture.h"
 
-int texture_io::create_texture(int width, int height, GLint format, GLenum type) {
+int texture_io::create_texture(int w, int h, GLint format, GLenum type) {
 	if (!tex) glGenTextures(1, &tex);
+
+	width = w;
+	height = h;
 
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, GL_RGBA, type, 0);

@@ -11,6 +11,10 @@ private:
 	GLuint fbo = 0;
 
 public:
+	int width;
+	int height;
+
+public:
 	~texture_io() {
 		if (tex) glDeleteTextures(1, &tex);
 		if (fbo) glDeleteFramebuffers(1, &fbo);
