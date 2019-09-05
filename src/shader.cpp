@@ -33,30 +33,33 @@ int shader::compile() {
 }
 
 int shader_program::compile() {
-	if (vertex.compile() != 0) return 1;
-	if (fragment.compile() != 0) return 1;
+	if (program_id) {
+		return 0;
+	} else {
+		program_id = glCreateProgram();
+	}
 
-	program_id = glCreateProgram();
-	glAttachShader(program_id, vertex.shader_id);
-	glAttachShader(program_id, fragment.shader_id);
+	for (shader *i : shaders) {
+		if (i->compile() != 0) return 1;
+		glAttachShader(program_id, i->shader_id);
+	}
+
 	glLinkProgram(program_id);
 
 	return 0;
 }
 
 void shader_program::update_uniforms() {
-	for (std::pair<const int, uniform *> &i : uniforms) {
-		int location = i.first;
-		uniform *uni = i.second;
-		switch(uni->type) {
-		case TYPE_INT:
-			glUniform1i(location, uni->value_int);
+    for (uniform_location &i : uniforms) {
+		switch(i.uni->type) {
+		case uniform::TYPE_INT:
+			glUniform1i(i.location, i.uni->value_int);
 			break;
-		case TYPE_FLOAT:
-			glUniform1f(location, uni->value_float);
+		case uniform::TYPE_FLOAT:
+			glUniform1f(i.location, i.uni->value_float);
 			break;
-		case TYPE_VEC2:
-			glUniform2f(location, uni->value_vec2.x, uni->value_vec2.y);
+		case uniform::TYPE_VEC2:
+			glUniform2f(i.location, i.uni->value_vec2.x, i.uni->value_vec2.y);
 			break;
 		}
 	}

@@ -2,7 +2,7 @@
 #define __SHADER_H__
 
 #include <GL/glew.h>
-#include <map>
+#include <vector>
 
 #include "resource.h"
 
@@ -44,15 +44,13 @@ private:
     friend class shader_program;
 };
 
-enum uniform_type {
-    TYPE_INT,
-    TYPE_FLOAT,
-    TYPE_VEC2
-};
-
 struct uniform {
     const char *name;
-    uniform_type type;
+    enum {
+        TYPE_INT,
+        TYPE_FLOAT,
+        TYPE_VEC2
+    } type;
 
     union {
         int value_int;
@@ -106,18 +104,25 @@ class shader_program {
 private:
 	GLuint program_id = 0;
 
-	shader &vertex;
-	shader &fragment;
+    struct uniform_location {
+        int location;
+        uniform *uni;
 
-    std::map<int, uniform *> uniforms;
+        uniform_location(int location, uniform *uni) : location(location), uni(uni) {}
+    };
+
+    std::vector<shader *> shaders;
+    std::vector<uniform_location> uniforms;
 
 public:
-    shader_program(shader &vertex, shader &fragment) : vertex(vertex), fragment(fragment) {}
+    template <typename ... Ts>
+    shader_program(Ts &... shaders) : shaders {&shaders ...} {}
 
     ~shader_program() {
         if (program_id) {
-            glDetachShader(program_id, vertex.shader_id);
-            glDetachShader(program_id, fragment.shader_id);
+            for (shader *i : shaders) {
+                glDetachShader(program_id, i->shader_id);
+            }
             glDeleteProgram(program_id);
         }
     }
@@ -126,7 +131,7 @@ public:
 
     void add_uniform(uniform &uni) {
         int location = glGetUniformLocation(program_id, uni.name);
-        uniforms[location] = &uni;
+        uniforms.emplace_back(location, &uni);
     }
 
     void add_uniforms() {}
