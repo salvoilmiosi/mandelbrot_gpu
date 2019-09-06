@@ -11,11 +11,6 @@
 #include "texture.h"
 #include "bitmap.h"
 
-const char *WINDOW_TITLE = "Mandelbrot";
-
-int window_width = 800;
-int window_height = 600;
-
 int current_tex = 0;
 
 bool vsync = false;
@@ -23,12 +18,8 @@ bool save_tex = false;
 
 enum { NumIterations = 1 };
 
-GLuint palette = 0; // palette texture
-
-texture_io tex1, tex2, tex_out;
-
-GLuint vao = 0;
-GLuint vbo = 0;
+texture tex1, tex2, tex_out, palette;
+framebuffer fbo1(tex1), fbo2(tex2), fbo3(tex_out);
 
 DECLARE_UNIFORM(in_texture, 1);				// sampler for input texture in shaders
 DECLARE_UNIFORM(outside_palette, 0);		// sampler for palette texture
@@ -112,32 +103,13 @@ int create_palette() {
 		//colors[i] = color_fade(colors[i], color_rgba(0xff,0xff,0xff), pow(i / (float)N_COLORS, 5));
 	}
 
-	if (!palette) glGenTextures(1, &palette);
-
-	glBindTexture(GL_TEXTURE_2D, palette);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, N_COLORS, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, colors);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	return 0;
-}
-
-int next_pow_2(int num) {
-	int n = 1;
-	while (n < num) {
-		n *= 2;
-	}
-	return n;
+	return palette.create_texture(N_COLORS, 1, GL_RGBA, GL_UNSIGNED_BYTE, colors);
 }
 
 int create_textures() {
-	int tex_width = next_pow_2(window_width);
-	int tex_height = next_pow_2(window_height);
-	if (tex1.create_texture(tex_width, tex_height, GL_RGBA32F, GL_FLOAT) != 0) return 1;
-	if (tex2.create_texture(tex_width, tex_height, GL_RGBA32F, GL_FLOAT) != 0) return 2;
-	if (tex_out.create_texture(tex_width, tex_height, GL_RGBA, GL_UNSIGNED_BYTE) != 0) return 3;
+	if (tex1.create_texture(window_width, window_height, GL_RGBA32F, GL_FLOAT) != 0) return 1;
+	if (tex2.create_texture(window_width, window_height, GL_RGBA32F, GL_FLOAT) != 0) return 2;
+	if (tex_out.create_texture(window_width, window_height, GL_RGBA, GL_UNSIGNED_BYTE) != 0) return 3;
 	return 0;
 }
 
@@ -157,31 +129,10 @@ int init_gl() {
 	if (create_palette() != 0) return 2;
 	if (create_textures() != 0) return 2;
 
-	const float vertices[] = {
-		-1.0,  1.0,
-		-1.0, -1.0,
-		 1.0,  1.0,
-		 1.0, -1.0,
-	};
-
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
-
 	return 0;
 }
 
 void cleanup_gl() {
-	glDeleteVertexArrays(1, &vao);
-	glDeleteBuffers(1, &vbo);
-
 	glDeleteTextures(1, &palette);
 }
 
@@ -198,7 +149,7 @@ inline void redraw_mandelbrot() {
 int save_screenshot() {
 	const char *filename = "screenshot.ppm";
 
-	size_t bufsize = tex_out.width * tex_out.height * 3;
+	size_t bufsize = window_width * window_height * 3;
 	GLubyte *data = (GLubyte*) malloc(bufsize);
 
 	if (!data) {
@@ -210,7 +161,7 @@ int save_screenshot() {
 	glGetnTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, bufsize, data);
 
 	if (check_gl_error("Could not read texture") == 0) {
-		if (save_ppm(filename, data, tex_out.width, tex_out.height) > 0) {
+		if (save_ppm(filename, data, window_width, window_height) > 0) {
 			printf("Saved screenshot to %s\n", filename);
 			return 0;
 		}
@@ -222,56 +173,46 @@ int save_screenshot() {
 }
 
 void render() {
-	glViewport(0, 0, tex1.width, tex1.height);
+	palette.bind(0);
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, palette);
-
-	glActiveTexture(GL_TEXTURE1);
-	tex1.bind_texture();
-	glActiveTexture(GL_TEXTURE2);
-	tex2.bind_texture();
-	glActiveTexture(GL_TEXTURE3);
-	tex_out.bind_texture();
+	tex1.bind(1);
+	tex2.bind(2);
+	tex_out.bind(3);
 
 	ratio = (float) window_width / window_height;
 
 	if (current_tex == 0) {
-		tex1.bind_framebuffer();
-		program_init.use_program();
-
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		fbo1.bind();
+		program_init.bind();
+		mesh.draw();
 
 		current_tex = 1;
 	}
 
-	(current_tex == 1 ? tex2 : tex1).bind_framebuffer();
+	(current_tex == 1 ? fbo2 : fbo1).bind();
 
 	in_texture = current_tex;
 
-	program_step.use_program();
-
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	program_step.bind();
+	mesh.draw();
 
 	current_tex = current_tex == 1 ? 2 : 1;
 	iteration.value_float += 1.f;
 
-	tex_out.bind_framebuffer();
-
-	program_draw.use_program();
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	fbo_out.bind();
+	program_draw.bind();
+	mesh.draw();
 
 	if (save_tex) {
 		save_tex = false;
 		save_screenshot();
 	}
 
-	glViewport(0, 0, window_width, window_height);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	in_texture = 3;
-	program_final.use_program();
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	program_final.bind();
+	mesh.draw();
 }
 
 void move_c_polar(float x_mul, float y_mul) {
@@ -282,7 +223,7 @@ void move_c_polar(float x_mul, float y_mul) {
 	julia_c = vec2(cos(theta) * radius, sin(theta) * radius);
 }
 
-void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+void key_callback_ext(GLFWwindow *window, int key, int scancode, int action, int mods) {
 	if (action == GLFW_PRESS) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE:
@@ -403,11 +344,7 @@ vec2 mouse_pt_to_scale(float mouse_x, float mouse_y) {
 	return pt;
 }
 
-void mouse_button_callback(GLFWwindow *window, int button, int action, int mods) {
-	double mouse_x, mouse_y;
-
-	glfwGetCursorPos(window, &mouse_x, &mouse_y);
-
+void mouse_callback(int button, int action, int mouse_x, int mouse_y) {
 	static float press_x, press_y;
 
 	switch (button) {
@@ -447,82 +384,50 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
 	}
 }
 
-void resize_callback(GLFWwindow *window, int width, int height) {
-	window_width = width;
-	window_height = height;
+void resize_callback(int width, int height) {
 	create_textures();
 	redraw_mandelbrot();
 }
 
-GLFWwindow *create_window() {
-	GLFWwindow *window;
-
-	glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
-
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	
-	window = glfwCreateWindow(window_width, window_height, WINDOW_TITLE, nullptr, nullptr);
-	if (window) return window;
-
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-	
-	return glfwCreateWindow(window_width, window_height, WINDOW_TITLE, nullptr, nullptr);
-}
-
 int main(int argc, char**argv) {
-	if (!glfwInit()) {
-		return 1;
-	}
+	const char *WINDOW_TITLE = "Mandelbrot";
+	const int WINDOW_WIDTH = 800;
+	const int WINDOW_HEIGHT = 600;
+
+	if (!glfwInit()) return 1;
 
 	glfwSetErrorCallback(error_callback);
+	glwindow window(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-	GLFWwindow *window = create_window();
-
-	if (!window) {
+	if (!window.success()) {
 		glfwTerminate();
 		return 3;
-	}
-
-	glfwMakeContextCurrent(window);
-
-	glfwSwapInterval(0);
-
-	glewExperimental = true;
-	GLenum error = glewInit();
-	if (error != GLEW_OK) {
-		fprintf(stderr, "GLEW error %d: %s\n", error, glewGetErrorString(error));
-		glfwTerminate();
-		return 2;
-	}
-
-	glfwSetKeyCallback(window, key_callback);
-	glfwSetMouseButtonCallback(window, mouse_button_callback);
-	glfwSetWindowSizeCallback(window, resize_callback);
-
-	if (init_gl() != 0) {
-		glfwTerminate();
-		return 4;
-	}
-
-	reset_mandelbrot();
-	redraw_mandelbrot();
-
-	while (!glfwWindowShouldClose(window)) {
-		for (int i=0; i<NumIterations; ++i) {
-			render();
+	} else {
+		glewExperimental = true;
+		GLenum error = glewInit();
+		if (error != GLEW_OK) {
+			fprintf(stderr, "GLEW error %d: %s\n", error, glewGetErrorString(error));
+			glfwTerminate();
+			return 2;
 		}
 
-		glfwSwapBuffers(window);
-		glfwPollEvents();
+		if (init_gl() != 0) {
+			glfwTerminate();
+			return 4;
+		}
+
+		reset_mandelbrot();
+		redraw_mandelbrot();
+
+		while (!glfwWindowShouldClose(window)) {
+			for (int i=0; i<NumIterations; ++i) {
+				render();
+			}
+
+			glfwSwapBuffers(window);
+			glfwPollEvents();
+		}
 	}
-
-	cleanup_gl();
-
-	glfwDestroyWindow(window);
 
 	glfwTerminate();
 	return 0;

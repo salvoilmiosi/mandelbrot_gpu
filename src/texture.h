@@ -5,27 +5,42 @@
 
 #include <cstdio>
 
-class texture_io {
+class texture {
 private:
 	GLuint tex = 0;
-	GLuint fbo = 0;
 
 public:
 	int width;
 	int height;
 
 public:
-	~texture_io() {
-		if (tex) glDeleteTextures(1, &tex);
-		if (fbo) glDeleteFramebuffers(1, &fbo);
-	}
-	int create_texture(int width, int height, GLint format, GLenum type);
+	int create_texture(int width, int height, GLint format, GLenum type, void *data = 0);
 
-    void bind_texture() {
+    void bind(int unit) {
+		glActiveTexture(GL_TEXTURE0 + unit);
         glBindTexture(GL_TEXTURE_2D, tex);
     }
 
-    void bind_framebuffer() {
+private:
+	friend class framebuffer;
+}
+
+class framebuffer {
+private:
+	texture &tex;
+
+	GLuint fbo = 0;
+
+public:
+	framebuffer(texture &tex);
+
+	~framebuffer() {
+		if (tex) glDeleteTextures(1, &tex);
+		if (fbo) glDeleteFramebuffers(1, &fbo);
+	}
+
+    void bind() {
+		glViewport(tex.width, tex.height);
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     }
 };

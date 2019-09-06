@@ -142,7 +142,7 @@ public:
         add_uniforms(unis...);
     }
 
-    void use_program() {
+    void bind() {
 	    glUseProgram(program_id);
         update_uniforms();
     }
