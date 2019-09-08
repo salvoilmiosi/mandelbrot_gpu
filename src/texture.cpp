@@ -1,6 +1,6 @@
 #include "texture.h"
 
-int texture::create_texture(int w, int h, GLint format, GLenum type, void *data = 0) {
+int texture::create_texture(int w, int h, GLint format, GLenum type, void *data) {
 	if (!tex) glGenTextures(1, &tex);
 
 	width = w;

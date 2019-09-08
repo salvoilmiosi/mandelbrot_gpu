@@ -10,6 +10,11 @@
 #include "shader.h"
 #include "texture.h"
 #include "bitmap.h"
+#include "display.h"
+
+const char *WINDOW_TITLE = "Mandelbrot";
+const int WINDOW_WIDTH = 800;
+const int WINDOW_HEIGHT = 600;
 
 int current_tex = 0;
 
@@ -21,28 +26,6 @@ enum { NumIterations = 1 };
 texture tex1, tex2, tex_out, palette;
 framebuffer fbo1(tex1), fbo2(tex2), fbo3(tex_out);
 
-DECLARE_UNIFORM(in_texture, 1);				// sampler for input texture in shaders
-DECLARE_UNIFORM(outside_palette, 0);		// sampler for palette texture
-DECLARE_UNIFORM(iteration, 0.0);			// number of iteration in algorithm
-DECLARE_UNIFORM(center, vec2(0.0, 0.0));	// center of rendering
-DECLARE_UNIFORM(scale, 1.5); 				// scale of rendering
-DECLARE_UNIFORM(ratio, 1.0);				// window width / window height
-DECLARE_UNIFORM(julia_c, vec2(-0.4, 0.6));	// C constant in Julia fractal
-DECLARE_UNIFORM(z_power, 2.0);				// Power of Z in algorithm
-DECLARE_UNIFORM(draw_julia, false);			// true:render Mandelbrot set - false:render Julia set
-DECLARE_UNIFORM(log_multiplier, 0.3);		// Shifts the "inner" colors in the draw shader
-DECLARE_UNIFORM(log_shift, 9.0);			// Shifts the "outer" colors in the draw shader
-
-DECLARE_SHADER(GL_VERTEX_SHADER, vertex);
-DECLARE_SHADER(GL_FRAGMENT_SHADER, init);
-DECLARE_SHADER(GL_FRAGMENT_SHADER, step);
-DECLARE_SHADER(GL_FRAGMENT_SHADER, draw);
-DECLARE_SHADER(GL_FRAGMENT_SHADER, final);
-
-shader_program program_init(SHADER(vertex), SHADER(init));
-shader_program program_step(SHADER(vertex), SHADER(step));
-shader_program program_draw(SHADER(vertex), SHADER(draw));
-shader_program program_final(SHADER(vertex), SHADER(final));
 
 void error_callback(int error, const char *description) {
 	fprintf(stderr, "GLFW error %d: %s\n", error, description);
@@ -107,9 +90,9 @@ int create_palette() {
 }
 
 int create_textures() {
-	if (tex1.create_texture(window_width, window_height, GL_RGBA32F, GL_FLOAT) != 0) return 1;
-	if (tex2.create_texture(window_width, window_height, GL_RGBA32F, GL_FLOAT) != 0) return 2;
-	if (tex_out.create_texture(window_width, window_height, GL_RGBA, GL_UNSIGNED_BYTE) != 0) return 3;
+	if (tex1.create_texture(display::width, display::height, GL_RGBA32F, GL_FLOAT) != 0) return 1;
+	if (tex2.create_texture(display::width, display::height, GL_RGBA32F, GL_FLOAT) != 0) return 2;
+	if (tex_out.create_texture(display::width, display::height, GL_RGBA, GL_UNSIGNED_BYTE) != 0) return 3;
 	return 0;
 }
 
@@ -132,24 +115,22 @@ int init_gl() {
 	return 0;
 }
 
-void cleanup_gl() {
-	glDeleteTextures(1, &palette);
-}
-
-inline void reset_mandelbrot() {
-	center = vec2(0.f, 0.f);
-	scale = 1.5f;
-}
-
 inline void redraw_mandelbrot() {
 	current_tex = 0;
 	iteration = 0.f;
 }
 
+inline void reset_mandelbrot() {
+	center = vec2(0.f, 0.f);
+	scale = 1.5f;
+
+	redraw_mandelbrot();
+}
+
 int save_screenshot() {
 	const char *filename = "screenshot.ppm";
 
-	size_t bufsize = window_width * window_height * 3;
+	size_t bufsize = display::width * display::height * 3;
 	GLubyte *data = (GLubyte*) malloc(bufsize);
 
 	if (!data) {
@@ -157,11 +138,12 @@ int save_screenshot() {
 		return 1;
 	}
 
-	tex_out.bind_texture();
+	tex_out.bind(1);
+
 	glGetnTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, bufsize, data);
 
 	if (check_gl_error("Could not read texture") == 0) {
-		if (save_ppm(filename, data, window_width, window_height) > 0) {
+		if (save_ppm(filename, data, display::width, display::height) > 0) {
 			printf("Saved screenshot to %s\n", filename);
 			return 0;
 		}
@@ -179,12 +161,12 @@ void render() {
 	tex2.bind(2);
 	tex_out.bind(3);
 
-	ratio = (float) window_width / window_height;
+	ratio = (float) display::width / display::height;
 
 	if (current_tex == 0) {
 		fbo1.bind();
 		program_init.bind();
-		mesh.draw();
+		mesh1.draw();
 
 		current_tex = 1;
 	}
@@ -194,14 +176,14 @@ void render() {
 	in_texture = current_tex;
 
 	program_step.bind();
-	mesh.draw();
+	mesh1.draw();
 
 	current_tex = current_tex == 1 ? 2 : 1;
 	iteration.value_float += 1.f;
 
 	fbo_out.bind();
 	program_draw.bind();
-	mesh.draw();
+	mesh1.draw();
 
 	if (save_tex) {
 		save_tex = false;
@@ -212,7 +194,7 @@ void render() {
 
 	in_texture = 3;
 	program_final.bind();
-	mesh.draw();
+	mesh1.draw();
 }
 
 void move_c_polar(float x_mul, float y_mul) {
@@ -223,7 +205,7 @@ void move_c_polar(float x_mul, float y_mul) {
 	julia_c = vec2(cos(theta) * radius, sin(theta) * radius);
 }
 
-void key_callback_ext(GLFWwindow *window, int key, int scancode, int action, int mods) {
+void key_callback(int key, int action) {
 	if (action == GLFW_PRESS) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE:
@@ -238,7 +220,6 @@ void key_callback_ext(GLFWwindow *window, int key, int scancode, int action, int
 			break;
 		case GLFW_KEY_R:
 			reset_mandelbrot();
-			redraw_mandelbrot();
 			break;
 		case GLFW_KEY_G:
 			vsync = !vsync;
@@ -333,10 +314,10 @@ void key_callback_ext(GLFWwindow *window, int key, int scancode, int action, int
 
 vec2 mouse_pt_to_scale(float mouse_x, float mouse_y) {
 	vec2 pt = center;
-	float scale_len = 2 * (float)scale / window_height;
+	float scale_len = 2 * (float)scale / display::height;
 
-	float dx_to_center = mouse_x - (window_width / 2);
-	float dy_to_center = mouse_y - (window_height / 2);
+	float dx_to_center = mouse_x - (display::width / 2);
+	float dy_to_center = mouse_y - (display::height / 2);
 
 	pt.x += dx_to_center * scale_len;
 	pt.y -= dy_to_center * scale_len;
@@ -359,7 +340,7 @@ void mouse_callback(int button, int action, int mouse_x, int mouse_y) {
 			center = mouse_pt_to_scale(press_x, press_y);
 
 			if (mouse_x != press_x || mouse_y != press_y) {
-				float scale_len = 2 * (float)scale / window_height;
+				float scale_len = 2 * (float)scale / display::height;
 
 				float dx = mouse_x - press_x;
 				float dy = mouse_y - press_y;
@@ -384,50 +365,38 @@ void mouse_callback(int button, int action, int mouse_x, int mouse_y) {
 	}
 }
 
-void resize_callback(int width, int height) {
+void resize_callback() {
 	create_textures();
 	redraw_mandelbrot();
 }
 
 int main(int argc, char**argv) {
-	const char *WINDOW_TITLE = "Mandelbrot";
-	const int WINDOW_WIDTH = 800;
-	const int WINDOW_HEIGHT = 600;
-
 	if (!glfwInit()) return 1;
 
 	glfwSetErrorCallback(error_callback);
-	glwindow window(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-	if (!window.success()) {
+	if (display::init_display(WINDOW_TITLE, display::width, display::height) != 0) {
 		glfwTerminate();
 		return 3;
-	} else {
-		glewExperimental = true;
-		GLenum error = glewInit();
-		if (error != GLEW_OK) {
-			fprintf(stderr, "GLEW error %d: %s\n", error, glewGetErrorString(error));
-			glfwTerminate();
-			return 2;
-		}
-
-		if (init_gl() != 0) {
-			glfwTerminate();
-			return 4;
-		}
-
-		reset_mandelbrot();
-		redraw_mandelbrot();
-
-		while (!glfwWindowShouldClose(window)) {
-			for (int i=0; i<NumIterations; ++i) {
-				render();
-			}
-
-			glfwSwapBuffers(window);
-			glfwPollEvents();
-		}
 	}
+
+	if (init_gl() != 0) {
+		glfwTerminate();
+		return 4;
+	}
+
+	reset_mandelbrot();
+
+	while (!glfwWindowShouldClose(window)) {
+		for (int i=0; i<NumIterations; ++i) {
+			render();
+		}
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+
+	display::cleanup_display();
 
 	glfwTerminate();
 	return 0;

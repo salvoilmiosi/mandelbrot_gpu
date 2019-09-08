@@ -14,6 +14,10 @@ public:
 	int height;
 
 public:
+	~texture() {
+		if (tex) glDeleteTextures(1, &tex);
+	}
+
 	int create_texture(int width, int height, GLint format, GLenum type, void *data = 0);
 
     void bind(int unit) {
@@ -23,7 +27,7 @@ public:
 
 private:
 	friend class framebuffer;
-}
+};
 
 class framebuffer {
 private:
@@ -35,12 +39,11 @@ public:
 	framebuffer(texture &tex);
 
 	~framebuffer() {
-		if (tex) glDeleteTextures(1, &tex);
 		if (fbo) glDeleteFramebuffers(1, &fbo);
 	}
 
     void bind() {
-		glViewport(tex.width, tex.height);
+		glViewport(0, 0, tex.width, tex.height);
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     }
 };

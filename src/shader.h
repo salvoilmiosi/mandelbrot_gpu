@@ -8,11 +8,12 @@
 
 #define SHADER_SOURCE(name) shader_##name##_glsl
 #define GET_SHADER_SOURCE(name) GET_RESOURCE(SHADER_SOURCE(name))
-#define SHADER(name) _shader_##name
 
-#define DECLARE_SHADER(type, name)      \
-DECLARE_BINARY(SHADER_SOURCE(name))     \
-shader SHADER(name)(#name, type, GET_SHADER_SOURCE(name));
+#define DECLARE_SHADER(name) DECLARE_BINARY(SHADER_SOURCE(name))
+#define DECLARE_SHADER_EXTERN(name) DECLARE_BINARY_EXTERN(SHADER_SOURCE(name))
+
+#define SHADER(name) _shader_##name
+#define SHADER_OBJECT(type, name) shader SHADER(name) (#name, type, GET_SHADER_SOURCE(name));
 
 #define DECLARE_UNIFORM(name, value) uniform name(#name, value);
 
@@ -32,7 +33,7 @@ private:
     const resource &source;
 
 public:
-    shader(const char *name, const GLenum type, const resource &source) : name(name), type(type), source(source) {};
+    shader(const char *name, const GLenum type, const resource &source) : name(name), type(type), source(source) {}
 
     ~shader() {
         glDeleteShader(shader_id);
